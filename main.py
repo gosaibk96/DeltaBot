@@ -12,66 +12,56 @@ app = Flask(__name__)
 def home():
     return "Delta India Bot Active"
 
-# Keys daalein
+# API Keys
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
 
-def get_delta_india_balance():
-    # Delta India Base URL
+def get_delta_balance():
+    # Official Delta India Base URL and Endpoint
     base_url = "https://api.india.delta.exchange"
     path = "/v2/wallet/balances"
     url = base_url + path
     method = "GET"
 
-    # Precise Timestamp (Seconds)
+    # Signature Construction
     timestamp = str(int(time.time()))
+    signature_payload = method + timestamp + path
     
-    # Signature Payload (Method + Timestamp + Path)
-    payload = method + timestamp + path
-    
-    # HMAC SHA256 Generation
     signature = hmac.new(
-        API_SECRET.encode('utf-8'),
-        payload.encode('utf-8'),
+        API_SECRET.strip().encode('utf-8'),
+        signature_payload.encode('utf-8'),
         hashlib.sha256
     ).hexdigest()
 
-    # Exact Headers Required by Delta India
     headers = {
         'api-key': API_KEY.strip(),
         'signature': signature,
         'timestamp': timestamp,
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0'
+        'User-Agent': 'DeltaBot/1.0'
     }
 
     try:
         response = requests.get(url, headers=headers, timeout=10)
-        data = response.json()
+        res_data = response.json()
 
         print("\n==============================")
-        print("TIMESTAMP:", timestamp)
-        print("RESPONSE STATUS:", response.status_code)
+        print("HTTP STATUS CODE:", response.status_code)
         
-        if response.status_code == 200 and data.get('success'):
-            print("✅ SUCCESS! BALANCE FETCHED:")
-            balances = data.get('result', [])
-            for item in balances:
-                print(f"Asset: {item.get('asset_symbol')} | Balance: {item.get('balance')} | Available: {item.get('available_balance')}")
-            if not balances:
-                print("Wallet Balance is 0")
+        if response.status_code == 200:
+            print("✅ SUCCESS! RESPONSE FROM DELTA INDIA:")
+            print(res_data)
         else:
-            print("❌ DELTA ERROR RESPONSE:", data)
+            print("❌ DELTA ERROR RESPONSE:", res_data)
             
         print("==============================\n")
 
     except Exception as e:
-        print(f"❌ CONNECTION EXCEPTION: {e}")
+        print(f"❌ Connection Exception: {e}")
 
 def run_loop():
     time.sleep(3)
     while True:
-        get_delta_india_balance()
+        get_delta_balance()
         time.sleep(20)
 
 if __name__ == '__main__':
