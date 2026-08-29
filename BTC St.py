@@ -15,24 +15,41 @@ RENDER_APP_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
 
 @app.route('/')
 def home():
-    return "Supertrend Bot Active & Order-Loop Fixed!"
+    return "Supertrend Dynamic Multi-Coin Bot Active!"
 
 # =====================================================================
-# ⚙️ USER CONFIGURATION
+# ⚙️ SIRF IN SETTINGS KO BADLEIN (BAAKI CODE KO CHHEDNE KI ZAROORAT NAHI)
 # =====================================================================
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
 BASE_URL = "https://api.india.delta.exchange"
 
-SYMBOL = "BTCUSD"
-PRODUCT_ID = 27       # BTCUSD Perpetual Contract ID
-TIMEFRAME = "1m"
-LOT_SIZE = 1         # 1 Lot = 0.001 BTC
-LEVERAGE = 10
+# 1. COIN & CONTRACT DETAILS
+SYMBOL = "BTCUSD"       # Examples: "BTCUSD", "ETHUSD", "SOLUSD"
+PRODUCT_ID = 27         # BTCUSD Perpetual = 27 (ETHUSD = 28, etc.)
 
-ST_PERIOD = 10
-ST_MULTIPLIER = 1.5
+# 2. TIMEFRAME CONFIGURATION
+TIMEFRAME = "15m"        # Options: "1m", "5m", "15m", "30m", "1h", "4h"
+
+# 3. POSITION CONFIGURATION
+LOT_SIZE = 5           # Kitne lots trade karne hain
+LEVERAGE = 10          # Leverage multiplier
+
+# 4. SUPERTREND PARAMETERS
+ST_PERIOD = 10         # Supertrend Period
+ST_MULTIPLIER = 1.5    # Supertrend Multiplier
 # =====================================================================
+
+# Auto Timeframe Seconds Mapping (Internal Calculator)
+TF_SECONDS_MAP = {
+    "1m": 60,
+    "5m": 300,
+    "15m": 900,
+    "30m": 1800,
+    "1h": 3600,
+    "4h": 14400,
+    "1d": 86400
+}
 
 def generate_signature(method, timestamp, path, payload=""):
     signature_data = method + timestamp + path + payload
@@ -42,7 +59,6 @@ def generate_signature(method, timestamp, path, payload=""):
         hashlib.sha256
     ).hexdigest()
 
-# Self-Ping Mechanism for Render
 def keep_awake():
     while True:
         time.sleep(240)
@@ -53,11 +69,12 @@ def keep_awake():
             except Exception as e:
                 print(f"Keep-Alive Error: {e}", flush=True)
 
-# 1. Fetch Candle Data
+# Auto-Adjusted Candle Fetching
 def fetch_candles():
     try:
         end_time = int(time.time())
-        start_time = end_time - (100 * 60)
+        candle_seconds = TF_SECONDS_MAP.get(TIMEFRAME, 60)
+        start_time = end_time - (120 * candle_seconds)  # Auto calculates historical range
         
         path = f"/v2/history/candles?symbol={SYMBOL}&resolution={TIMEFRAME}&start={start_time}&end={end_time}"
         res = requests.get(BASE_URL + path, timeout=10)
@@ -78,7 +95,6 @@ def fetch_candles():
         print(f"Candle Fetch Exception: {e}", flush=True)
         return None
 
-# 2. Supertrend Calculation
 def calculate_supertrend(df):
     high_low = df['high'] - df['low']
     high_close = np.abs(df['high'] - df['close'].shift())
@@ -120,7 +136,6 @@ def calculate_supertrend(df):
     df['st_direction'] = direction
     return df
 
-# 3. Flexible Order Execution
 def place_order(side, reduce_only=False):
     try:
         path = "/v2/orders"
@@ -147,13 +162,12 @@ def place_order(side, reduce_only=False):
         print(f"Order Exception: {e}", flush=True)
         return {}
 
-# 4. Strategy Engine
 def strategy_loop():
     time.sleep(5)
-    current_position = None     # Current Active Position: None, "BUY", "SELL"
+    current_position = None
     last_signal_direction = None
 
-    print("🚀 BOT RUNNING (ORDER REPEAT BUG FIXED)!", flush=True)
+    print(f"🚀 BOT ACTIVE: {SYMBOL} | TF: {TIMEFRAME} | LOTS: {LOT_SIZE}", flush=True)
 
     while True:
         try:
@@ -167,48 +181,41 @@ def strategy_loop():
                 st_val = closed_candle['supertrend']
                 closed_direction = closed_candle['st_direction']
 
-                # First Run Initialization
                 if last_signal_direction is None:
                     last_signal_direction = closed_direction
-                    print(f"⏳ INITIALIZED: Base Trend Direction: {closed_direction}. Waiting...", flush=True)
+                    print(f"⏳ INITIALIZED: Base Direction: {closed_direction}", flush=True)
 
-                print(f"[{time.strftime('%H:%M:%S')}] Live: {live_price} | Close: {closed_price} | ST: {round(st_val,2)} | Pos: {current_position}", flush=True)
+                print(f"[{time.strftime('%H:%M:%S')}] {SYMBOL} Live: {live_price} | Close: {closed_price} | ST: {round(st_val,2)} | Pos: {current_position}", flush=True)
 
-                # =====================================================
-                # 🛑 STEP 1: INSTANT TOUCH EXIT ONLY
-                # =====================================================
+                # 🛑 STEP 1: INSTANT TOUCH EXIT
                 if current_position == "BUY" and live_price <= st_val:
-                    print("⚡ TOUCH EXIT: Price touched Supertrend! Closing Long Position...", flush=True)
+                    print(f"⚡ TOUCH EXIT: {SYMBOL} Price touched ST! Closing Long...", flush=True)
                     place_order("sell", reduce_only=True)
                     current_position = None
-                    last_signal_direction = 1  # Lock: Requires Fresh Red Candle Close for SELL
-                    time.sleep(5)  # Cooldown safety
+                    last_signal_direction = 1
+                    time.sleep(5)
                     continue
 
                 elif current_position == "SELL" and live_price >= st_val:
-                    print("⚡ TOUCH EXIT: Price touched Supertrend! Closing Short Position...", flush=True)
+                    print(f"⚡ TOUCH EXIT: {SYMBOL} Price touched ST! Closing Short...", flush=True)
                     place_order("buy", reduce_only=True)
                     current_position = None
-                    last_signal_direction = -1  # Lock: Requires Fresh Green Candle Close for BUY
-                    time.sleep(5)  # Cooldown safety
+                    last_signal_direction = -1
+                    time.sleep(5)
                     continue
 
-                # =====================================================
-                # 🟢🔴 STEP 2: FRESH ENTRY (STRICT CONFIRMATION)
-                # =====================================================
+                # 🟢🔴 STEP 2: FRESH ENTRY
                 if current_position is None:
-                    # BUY Signal: Closed > Supertrend AND Fresh Reversal (was Red)
                     if closed_price > st_val and last_signal_direction == -1:
-                        print("🟢 FRESH BREAKOUT: Candle Closed Above ST! Opening BUY...", flush=True)
+                        print(f"🟢 ENTRY: Candle Closed Above ST! Buying {SYMBOL}...", flush=True)
                         res = place_order("buy", reduce_only=False)
                         if res.get('success'):
                             current_position = "BUY"
                             last_signal_direction = 1
                             time.sleep(5)
 
-                    # SELL Signal: Closed < Supertrend AND Fresh Reversal (was Green)
                     elif closed_price < st_val and last_signal_direction == 1:
-                        print("🔴 FRESH BREAKOUT: Candle Closed Below ST! Opening SELL...", flush=True)
+                        print(f"🔴 ENTRY: Candle Closed Below ST! Selling {SYMBOL}...", flush=True)
                         res = place_order("sell", reduce_only=False)
                         if res.get('success'):
                             current_position = "SELL"
