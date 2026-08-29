@@ -30,7 +30,7 @@ ST_MULTIPLIER = 1.5
 COINS_TO_TRADE = [
     {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "15m",  "lot_size": 0},
     {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "1m",  "lot_size": 10},
-    {"symbol": "ETHUSD",   "product_id": 28,     "timeframe": "1m",  "lot_size": 2},   # ETH Lot Size = 2
+    {"symbol": "ETHUSD",   "product_id": 3136,     "timeframe": "1m",  "lot_size": 2},   # ETH Lot Size = 2
     {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "15m", "lot_size": 0},
     {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "1m", "lot_size": 10},
     {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "15m", "lot_size": 0},
