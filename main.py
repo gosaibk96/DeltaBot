@@ -15,40 +15,33 @@ RENDER_APP_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
 
 @app.route('/')
 def home():
-    return "Supertrend Dynamic Multi-Coin Bot Active!"
+    return "Multi-Coin Supertrend Bot Active!"
 
 # =====================================================================
-# ⚙️ SIRF IN SETTINGS KO BADLEIN (BAAKI CODE KO CHHEDNE KI ZAROORAT NAHI)
+# ⚙️ USER CONFIGURATION & API KEYS
 # =====================================================================
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
 BASE_URL = "https://api.india.delta.exchange"
 
-# 1. COIN & CONTRACT DETAILS
-SYMBOL = "BTCUSD"       # Examples: "BTCUSD", "ETHUSD", "SOLUSD"
-PRODUCT_ID = 27         # BTCUSD Perpetual = 27 (ETHUSD = 28, etc.)
+# COMMON SUPERTREND SETTINGS (SABHI COINS KE LIYE SAME)
+ST_PERIOD = 10
+ST_MULTIPLIER = 1.5
 
-# 2. TIMEFRAME CONFIGURATION
-TIMEFRAME = "15m"        # Options: "1m", "5m", "15m", "30m", "1h", "4h"
-
-# 3. POSITION CONFIGURATION
-LOT_SIZE = 5           # Kitne lots trade karne hain
-LEVERAGE = 10          # Leverage multiplier
-
-# 4. SUPERTREND PARAMETERS
-ST_PERIOD = 10         # Supertrend Period
-ST_MULTIPLIER = 1.5    # Supertrend Multiplier
+# 🚀 AAPKI SELECTED 6 INSTRUMENTS KI LIST
+# Aap kabhi bhi GitHub se timeframe ya lot_size directly change kar sakte hain
+COINS_TO_TRADE = [
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "1m",  "lot_size": 1},
+    {"symbol": "XAUUSD",   "product_id": 313,    "timeframe": "1m",  "lot_size": 2},   # Gold
+    {"symbol": "ETHUSD",   "product_id": 28,     "timeframe": "1m",  "lot_size": 1},   # ETF / ETH
+    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "1m", "lot_size": 0},
+    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "1m", "lot_size": 1}, # Index
+    {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "1m", "lot_size": 0},
+]
 # =====================================================================
 
-# Auto Timeframe Seconds Mapping (Internal Calculator)
 TF_SECONDS_MAP = {
-    "1m": 60,
-    "5m": 300,
-    "15m": 900,
-    "30m": 1800,
-    "1h": 3600,
-    "4h": 14400,
-    "1d": 86400
+    "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400
 }
 
 def generate_signature(method, timestamp, path, payload=""):
@@ -69,14 +62,13 @@ def keep_awake():
             except Exception as e:
                 print(f"Keep-Alive Error: {e}", flush=True)
 
-# Auto-Adjusted Candle Fetching
-def fetch_candles():
+def fetch_candles(symbol, timeframe):
     try:
         end_time = int(time.time())
-        candle_seconds = TF_SECONDS_MAP.get(TIMEFRAME, 60)
-        start_time = end_time - (120 * candle_seconds)  # Auto calculates historical range
+        candle_seconds = TF_SECONDS_MAP.get(timeframe, 60)
+        start_time = end_time - (120 * candle_seconds)
         
-        path = f"/v2/history/candles?symbol={SYMBOL}&resolution={TIMEFRAME}&start={start_time}&end={end_time}"
+        path = f"/v2/history/candles?symbol={symbol}&resolution={timeframe}&start={start_time}&end={end_time}"
         res = requests.get(BASE_URL + path, timeout=10)
         
         if res.status_code == 200:
@@ -89,10 +81,9 @@ def fetch_candles():
                 df['low'] = df['low'].astype(float)
                 df['volume'] = df['volume'].astype(float)
                 return df
-        print("API Warning:", res.text, flush=True)
         return None
     except Exception as e:
-        print(f"Candle Fetch Exception: {e}", flush=True)
+        print(f"[{symbol}] Candle Exception: {e}", flush=True)
         return None
 
 def calculate_supertrend(df):
@@ -136,13 +127,13 @@ def calculate_supertrend(df):
     df['st_direction'] = direction
     return df
 
-def place_order(side, reduce_only=False):
+def place_order(product_id, lot_size, side, reduce_only=False):
     try:
         path = "/v2/orders"
         timestamp = str(int(time.time()))
         payload_dict = {
-            "product_id": PRODUCT_ID,
-            "size": LOT_SIZE,
+            "product_id": product_id,
+            "size": lot_size,
             "side": side,
             "order_type": "market_order"
         }
@@ -162,16 +153,20 @@ def place_order(side, reduce_only=False):
         print(f"Order Exception: {e}", flush=True)
         return {}
 
-def strategy_loop():
-    time.sleep(5)
+def run_coin_strategy(coin):
+    symbol = coin["symbol"]
+    product_id = coin["product_id"]
+    timeframe = coin["timeframe"]
+    lot_size = coin["lot_size"]
+    
     current_position = None
     last_signal_direction = None
 
-    print(f"🚀 BOT ACTIVE: {SYMBOL} | TF: {TIMEFRAME} | LOTS: {LOT_SIZE}", flush=True)
+    print(f"✅ ACTIVE: {symbol} | TF: {timeframe} | Lot Size: {lot_size}", flush=True)
 
     while True:
         try:
-            df = fetch_candles()
+            df = fetch_candles(symbol, timeframe)
             if df is not None and len(df) > ST_PERIOD + 2:
                 df = calculate_supertrend(df)
                 
@@ -183,22 +178,19 @@ def strategy_loop():
 
                 if last_signal_direction is None:
                     last_signal_direction = closed_direction
-                    print(f"⏳ INITIALIZED: Base Direction: {closed_direction}", flush=True)
-
-                print(f"[{time.strftime('%H:%M:%S')}] {SYMBOL} Live: {live_price} | Close: {closed_price} | ST: {round(st_val,2)} | Pos: {current_position}", flush=True)
 
                 # 🛑 STEP 1: INSTANT TOUCH EXIT
                 if current_position == "BUY" and live_price <= st_val:
-                    print(f"⚡ TOUCH EXIT: {SYMBOL} Price touched ST! Closing Long...", flush=True)
-                    place_order("sell", reduce_only=True)
+                    print(f"⚡ EXIT [LONG]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
+                    place_order(product_id, lot_size, "sell", reduce_only=True)
                     current_position = None
                     last_signal_direction = 1
                     time.sleep(5)
                     continue
 
                 elif current_position == "SELL" and live_price >= st_val:
-                    print(f"⚡ TOUCH EXIT: {SYMBOL} Price touched ST! Closing Short...", flush=True)
-                    place_order("buy", reduce_only=True)
+                    print(f"⚡ EXIT [SHORT]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
+                    place_order(product_id, lot_size, "buy", reduce_only=True)
                     current_position = None
                     last_signal_direction = -1
                     time.sleep(5)
@@ -207,27 +199,30 @@ def strategy_loop():
                 # 🟢🔴 STEP 2: FRESH ENTRY
                 if current_position is None:
                     if closed_price > st_val and last_signal_direction == -1:
-                        print(f"🟢 ENTRY: Candle Closed Above ST! Buying {SYMBOL}...", flush=True)
-                        res = place_order("buy", reduce_only=False)
+                        print(f"🟢 BUY ENTRY: {symbol} ({timeframe}) Closed Above Supertrend!", flush=True)
+                        res = place_order(product_id, lot_size, "buy", reduce_only=False)
                         if res.get('success'):
                             current_position = "BUY"
                             last_signal_direction = 1
                             time.sleep(5)
 
                     elif closed_price < st_val and last_signal_direction == 1:
-                        print(f"🔴 ENTRY: Candle Closed Below ST! Selling {SYMBOL}...", flush=True)
-                        res = place_order("sell", reduce_only=False)
+                        print(f"🔴 SELL ENTRY: {symbol} ({timeframe}) Closed Below Supertrend!", flush=True)
+                        res = place_order(product_id, lot_size, "sell", reduce_only=False)
                         if res.get('success'):
                             current_position = "SELL"
                             last_signal_direction = -1
                             time.sleep(5)
 
         except Exception as e:
-            print(f"Strategy Loop Exception: {e}", flush=True)
+            print(f"[{symbol}] Loop Exception: {e}", flush=True)
 
         time.sleep(5)
 
-threading.Thread(target=strategy_loop, daemon=True).start()
+# START ALL THREADS
+for coin in COINS_TO_TRADE:
+    threading.Thread(target=run_coin_strategy, args=(coin,), daemon=True).start()
+
 threading.Thread(target=keep_awake, daemon=True).start()
 
 if __name__ == '__main__':
