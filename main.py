@@ -15,7 +15,7 @@ RENDER_APP_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
 
 @app.route('/')
 def home():
-    return "Multi-Coin Supertrend Bot Active & Logging!"
+    return "Multi-Coin Bot Active & Logging!"
 
 # =====================================================================
 # ⚙️ USER CONFIGURATION & API KEYS
@@ -24,18 +24,16 @@ API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
 BASE_URL = "https://api.india.delta.exchange"
 
-# COMMON SUPERTREND SETTINGS (SABHI COINS KE LIYE SAME)
 ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
-# 🚀 AAPKI SELECTED 6 INSTRUMENTS KI LIST
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "1m",  "lot_size": 0},
-    {"symbol": "XAUTUSD",   "product_id": 131253,    "timeframe": "1m",  "lot_size": 2},   # Gold (Tether Gold)
-    {"symbol": "ETHUSD",   "product_id": 28,     "timeframe": "1m",  "lot_size": 1},   # ETF / ETH
-    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "1m", "lot_size": 0},
-    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "1m", "lot_size": 2}, # Index
-    {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "1m", "lot_size": 0},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "15m",  "lot_size": 0},
+    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "1m",  "lot_size": 10},
+    {"symbol": "ETHUSD",   "product_id": 28,     "timeframe": "1m",  "lot_size": 2},   # ETH Lot Size = 2
+    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "15m", "lot_size": 0},
+    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "1m", "lot_size": 10},
+    {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "15m", "lot_size": 0},
 ]
 # =====================================================================
 
@@ -51,14 +49,13 @@ def generate_signature(method, timestamp, path, payload=""):
         hashlib.sha256
     ).hexdigest()
 
-# ⏰ SERVER KO JAGANE WAALA POINT (KEEP-ALIVE PING)
 def keep_awake():
     while True:
-        time.sleep(120)  # Har 2 minute me ping karega
+        time.sleep(120)
         if RENDER_APP_URL:
             try:
                 requests.get(RENDER_APP_URL, timeout=5)
-                print("⏰ Keep-Alive Ping Sent to Render Server!", flush=True)
+                print("⏰ Keep-Alive Ping Sent!", flush=True)
             except Exception as e:
                 print(f"Keep-Alive Error: {e}", flush=True)
 
@@ -81,7 +78,6 @@ def fetch_candles(symbol, timeframe):
                 df['low'] = df['low'].astype(float)
                 df['volume'] = df['volume'].astype(float)
                 return df
-        print(f"[{symbol}] API Warning: {res.text}", flush=True)
         return None
     except Exception as e:
         print(f"[{symbol}] Candle Exception: {e}", flush=True)
@@ -159,7 +155,12 @@ def run_coin_strategy(coin):
     product_id = coin["product_id"]
     timeframe = coin["timeframe"]
     lot_size = coin["lot_size"]
-    
+
+    # 🛑 0 Lot wale coins ko skip kardo
+    if lot_size <= 0:
+        print(f"⏸️ SKIPPED: {symbol} (lot_size is 0)", flush=True)
+        return
+
     current_position = None
     last_signal_direction = None
 
@@ -180,14 +181,14 @@ def run_coin_strategy(coin):
                 if last_signal_direction is None:
                     last_signal_direction = closed_direction
 
-                # 📊 TERMINAL LOG PRINTING (Har cycle par log update hoga)
                 t_str = time.strftime('%H:%M:%S')
                 print(f"[{t_str}] {symbol} ({timeframe}) | Live: {live_price} | ST: {round(st_val,2)} | Pos: {current_position}", flush=True)
 
                 # 🛑 STEP 1: INSTANT TOUCH EXIT
                 if current_position == "BUY" and live_price <= st_val:
                     print(f"⚡ EXIT [LONG]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
-                    place_order(product_id, lot_size, "sell", reduce_only=True)
+                    res = place_order(product_id, lot_size, "sell", reduce_only=True)
+                    print(f"[{symbol}] Exit Response: {res}", flush=True)
                     current_position = None
                     last_signal_direction = 1
                     time.sleep(5)
@@ -195,7 +196,8 @@ def run_coin_strategy(coin):
 
                 elif current_position == "SELL" and live_price >= st_val:
                     print(f"⚡ EXIT [SHORT]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
-                    place_order(product_id, lot_size, "buy", reduce_only=True)
+                    res = place_order(product_id, lot_size, "buy", reduce_only=True)
+                    print(f"[{symbol}] Exit Response: {res}", flush=True)
                     current_position = None
                     last_signal_direction = -1
                     time.sleep(5)
@@ -206,6 +208,7 @@ def run_coin_strategy(coin):
                     if closed_price > st_val and last_signal_direction == -1:
                         print(f"🟢 BUY ENTRY: {symbol} ({timeframe}) Closed Above Supertrend!", flush=True)
                         res = place_order(product_id, lot_size, "buy", reduce_only=False)
+                        print(f"[{symbol}] Entry Response: {res}", flush=True)
                         if res.get('success'):
                             current_position = "BUY"
                             last_signal_direction = 1
@@ -214,6 +217,7 @@ def run_coin_strategy(coin):
                     elif closed_price < st_val and last_signal_direction == 1:
                         print(f"🔴 SELL ENTRY: {symbol} ({timeframe}) Closed Below Supertrend!", flush=True)
                         res = place_order(product_id, lot_size, "sell", reduce_only=False)
+                        print(f"[{symbol}] Entry Response: {res}", flush=True)
                         if res.get('success'):
                             current_position = "SELL"
                             last_signal_direction = -1
@@ -222,13 +226,12 @@ def run_coin_strategy(coin):
         except Exception as e:
             print(f"[{symbol}] Loop Exception: {e}", flush=True)
 
-        time.sleep(10) # 10 seconds ka interval per check
+        time.sleep(10)
 
-# ALL THREADS START
+# START THREADS
 for coin in COINS_TO_TRADE:
     threading.Thread(target=run_coin_strategy, args=(coin,), daemon=True).start()
 
-# KEEP-ALIVE THREAD START
 threading.Thread(target=keep_awake, daemon=True).start()
 
 if __name__ == '__main__':
