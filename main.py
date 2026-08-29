@@ -13,19 +13,19 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Pure Supertrend Strategy Active!"
+    return "Pure Supertrend Completed Candle Bot Active!"
 
 # =====================================================================
-# ⚙️ CUSTOMIZATION PARAMETERS (Top Variables)
+# ⚙️ EASY CUSTOMIZATION PARAMETERS
 # =====================================================================
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
 BASE_URL = "https://api.india.delta.exchange"
 
 SYMBOL = "BTCUSD"
-PRODUCT_ID = 27       # BTCUSD Perpetual Contract ID (Delta India)
-TIMEFRAME = "1m"      # Timeframe: "1m", "5m", "15m"
-LOT_SIZE = 1         # Lot size (1 Lot = 0.001 BTC)
+PRODUCT_ID = 27       # BTCUSD Perpetual Contract ID
+TIMEFRAME = "1m"      # Options: "1m", "5m", "15m"
+LOT_SIZE = 1         # 1 Lot = 0.001 BTC
 LEVERAGE = 10         # Leverage
 
 ST_PERIOD = 10        # Supertrend Period
@@ -40,20 +40,18 @@ def generate_signature(method, timestamp, path, payload=""):
         hashlib.sha256
     ).hexdigest()
 
-# 1. Fetch Candle Data (Exact Delta History API Endpoint)
+# 1. Fetch Candles
 def fetch_candles():
     try:
         end_time = int(time.time())
-        start_time = end_time - (100 * 60)  # Fetch last 100 minutes
+        start_time = end_time - (100 * 60)
         
-        # Endpoint path with correct query parameters
         path = f"/v2/history/candles?symbol={SYMBOL}&resolution={TIMEFRAME}&start={start_time}&end={end_time}"
         res = requests.get(BASE_URL + path, timeout=10)
         data = res.json()
         
         if data.get('success') and 'result' in data and len(data['result']) > 0:
             df = pd.DataFrame(data['result'])
-            # Delta returns candles newest to oldest -> invert DataFrame
             df = df.iloc[::-1].reset_index(drop=True)
             df['close'] = df['close'].astype(float)
             df['high'] = df['high'].astype(float)
@@ -61,13 +59,13 @@ def fetch_candles():
             df['volume'] = df['volume'].astype(float)
             return df
         else:
-            print("Candle API Error Details:", data, flush=True)
+            print("Candle API Warning:", data, flush=True)
             return None
     except Exception as e:
         print(f"Error fetching candles: {e}", flush=True)
         return None
 
-# 2. Pure Supertrend Indicator Calculation
+# 2. Supertrend Calculation
 def calculate_supertrend(df):
     high_low = df['high'] - df['low']
     high_close = np.abs(df['high'] - df['close'].shift())
@@ -109,7 +107,7 @@ def calculate_supertrend(df):
     df['st_direction'] = direction
     return df
 
-# 3. Place Order Function
+# 3. Order Placement Function
 def place_market_order(side):
     path = "/v2/orders"
     timestamp = str(int(time.time()))
@@ -128,44 +126,45 @@ def place_market_order(side):
     res = requests.post(BASE_URL + path, headers=headers, data=payload, timeout=10)
     return res.json()
 
-# 4. Strategy Main Engine
+# 4. Strategy Engine (Strict Closed Candle Execution)
 def strategy_loop():
     time.sleep(5)
     current_position = None
-    print("🚀 PURE SUPERTREND (10, 1.5) STRATEGY STARTED!", flush=True)
+    print("🚀 SUPERTREND BOT STARTED (STRICT CLOSED CANDLE MODE)!", flush=True)
 
     while True:
         try:
             df = fetch_candles()
-            if df is not None and len(df) > ST_PERIOD:
+            if df is not None and len(df) > ST_PERIOD + 2:
                 df = calculate_supertrend(df)
                 
-                last_candle = df.iloc[-1]
-                close_price = last_candle['close']
-                st_val = last_candle['supertrend']
+                # df.iloc[-2] is the LAST FULLY CLOSED CANDLE (Not running candle)
+                closed_candle = df.iloc[-2]
+                close_price = closed_candle['close']
+                st_val = closed_candle['supertrend']
 
-                print(f"[{time.strftime('%H:%M:%S')}] BTC Price: {close_price} | Supertrend: {round(st_val, 2)} | Pos: {current_position}", flush=True)
+                print(f"[{time.strftime('%H:%M:%S')}] Closed Candle Price: {close_price} | Supertrend: {round(st_val, 2)} | Active Pos: {current_position}", flush=True)
 
-                # BUY Condition: Close > Supertrend
+                # BUY TRIGGER (Closed Price > Supertrend)
                 if close_price > st_val and current_position != "BUY":
-                    print("🟢 BUY SIGNAL: Close > Supertrend!", flush=True)
+                    print("🟢 BUY SIGNAL: Candle Closed Above Supertrend!", flush=True)
                     res = place_market_order("buy")
-                    print("BUY Response:", res, flush=True)
+                    print("BUY Executed:", res, flush=True)
                     if res.get('success'):
                         current_position = "BUY"
 
-                # SELL Condition: Close < Supertrend
+                # SELL TRIGGER (Closed Price < Supertrend)
                 elif close_price < st_val and current_position != "SELL":
-                    print("🔴 SELL SIGNAL: Close < Supertrend!", flush=True)
+                    print("🔴 SELL SIGNAL: Candle Closed Below Supertrend!", flush=True)
                     res = place_market_order("sell")
-                    print("SELL Response:", res, flush=True)
+                    print("SELL Executed:", res, flush=True)
                     if res.get('success'):
                         current_position = "SELL"
 
         except Exception as e:
-            print(f"Strategy Loop Exception: {e}", flush=True)
+            print(f"Loop Exception: {e}", flush=True)
 
-        time.sleep(10)
+        time.sleep(15)  # Scan every 15 seconds
 
 threading.Thread(target=strategy_loop, daemon=True).start()
 
