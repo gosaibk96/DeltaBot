@@ -15,7 +15,7 @@ RENDER_APP_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
 
 @app.route('/')
 def home():
-    return "Multi-Coin Supertrend Bot Active!"
+    return "Multi-Coin Supertrend Bot Active & Logging!"
 
 # =====================================================================
 # ⚙️ USER CONFIGURATION & API KEYS
@@ -29,13 +29,12 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 # 🚀 AAPKI SELECTED 6 INSTRUMENTS KI LIST
-# Aap kabhi bhi GitHub se timeframe ya lot_size directly change kar sakte hain
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "1m",  "lot_size": 1},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "1m",  "lot_size": 0},
     {"symbol": "XAUUSD",   "product_id": 313,    "timeframe": "1m",  "lot_size": 2},   # Gold
     {"symbol": "ETHUSD",   "product_id": 28,     "timeframe": "1m",  "lot_size": 1},   # ETF / ETH
     {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "1m", "lot_size": 0},
-    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "1m", "lot_size": 1}, # Index
+    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "1m", "lot_size": 2}, # Index
     {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "1m", "lot_size": 0},
 ]
 # =====================================================================
@@ -52,13 +51,14 @@ def generate_signature(method, timestamp, path, payload=""):
         hashlib.sha256
     ).hexdigest()
 
+# ⏰ SERVER KO JAGANE WAALA POINT (KEEP-ALIVE PING)
 def keep_awake():
     while True:
-        time.sleep(240)
+        time.sleep(120)  # Har 2 minute me ping karega
         if RENDER_APP_URL:
             try:
                 requests.get(RENDER_APP_URL, timeout=5)
-                print("⏰ Keep-Alive Ping Sent!", flush=True)
+                print("⏰ Keep-Alive Ping Sent to Render Server!", flush=True)
             except Exception as e:
                 print(f"Keep-Alive Error: {e}", flush=True)
 
@@ -81,6 +81,7 @@ def fetch_candles(symbol, timeframe):
                 df['low'] = df['low'].astype(float)
                 df['volume'] = df['volume'].astype(float)
                 return df
+        print(f"[{symbol}] API Warning: {res.text}", flush=True)
         return None
     except Exception as e:
         print(f"[{symbol}] Candle Exception: {e}", flush=True)
@@ -162,7 +163,7 @@ def run_coin_strategy(coin):
     current_position = None
     last_signal_direction = None
 
-    print(f"✅ ACTIVE: {symbol} | TF: {timeframe} | Lot Size: {lot_size}", flush=True)
+    print(f"✅ INITIALIZING: {symbol} | TF: {timeframe} | Lots: {lot_size}", flush=True)
 
     while True:
         try:
@@ -178,6 +179,10 @@ def run_coin_strategy(coin):
 
                 if last_signal_direction is None:
                     last_signal_direction = closed_direction
+
+                # 📊 TERMINAL LOG PRINTING (Har cycle par log update hoga)
+                t_str = time.strftime('%H:%M:%S')
+                print(f"[{t_str}] {symbol} ({timeframe}) | Live: {live_price} | ST: {round(st_val,2)} | Pos: {current_position}", flush=True)
 
                 # 🛑 STEP 1: INSTANT TOUCH EXIT
                 if current_position == "BUY" and live_price <= st_val:
@@ -217,12 +222,13 @@ def run_coin_strategy(coin):
         except Exception as e:
             print(f"[{symbol}] Loop Exception: {e}", flush=True)
 
-        time.sleep(5)
+        time.sleep(10) # 10 seconds ka interval per check
 
-# START ALL THREADS
+# ALL THREADS START
 for coin in COINS_TO_TRADE:
     threading.Thread(target=run_coin_strategy, args=(coin,), daemon=True).start()
 
+# KEEP-ALIVE THREAD START
 threading.Thread(target=keep_awake, daemon=True).start()
 
 if __name__ == '__main__':
