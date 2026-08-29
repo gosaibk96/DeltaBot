@@ -16,19 +16,18 @@ def home():
     return "Supertrend + VWAP Strategy Active!"
 
 # =====================================================================
-# ⚙️ USER CONFIGURATION (YAHAN SE VALUES EASY CHANGE KAREIN)
+# ⚙️ USER CONFIGURATION
 # =====================================================================
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
 BASE_URL = "https://api.india.delta.exchange"
 
 SYMBOL = "BTCUSD"
-PRODUCT_ID = 27       # Delta India BTCUSD Perpetual Contract ID
-TIMEFRAME = "1m"      # Timeframe: 1m, 5m, 15m
+PRODUCT_ID = 27       # BTCUSD Perpetual Contract ID
+TIMEFRAME = "1m"      # Timeframe
 LOT_SIZE = 1         # 1 Lot = 0.001 BTC
 LEVERAGE = 10         # Leverage
 
-# Strategy Parameters
 ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 # =====================================================================
@@ -41,29 +40,37 @@ def generate_signature(method, timestamp, path, payload=""):
         hashlib.sha256
     ).hexdigest()
 
-# 1. Fetch Candle Data
+# 1. Fetch Candle Data (Fixed Delta API parsing)
 def fetch_candles():
-    # Fetching historical candles for Supertrend & VWAP
-    path = f"/v2/chart/candles?symbol={SYMBOL}&resolution={TIMEFRAME}"
-    res = requests.get(BASE_URL + path, timeout=10)
-    data = res.json()
-    if 'result' in data:
-        df = pd.DataFrame(data['result'])
-        df = df.iloc[::-1].reset_index(drop=True) # Sort oldest to newest
-        df['close'] = df['close'].astype(float)
-        df['high'] = df['high'].astype(float)
-        df['low'] = df['low'].astype(float)
-        df['volume'] = df['volume'].astype(float)
-        return df
-    return None
+    try:
+        # Delta API resolution format: 1m, 5m, 15m
+        path = f"/v2/chart/candles?symbol={SYMBOL}&resolution={TIMEFRAME}"
+        res = requests.get(BASE_URL + path, timeout=10)
+        data = res.json()
+        
+        if data.get('success') and 'result' in data and len(data['result']) > 0:
+            df = pd.DataFrame(data['result'])
+            # Delta returns newest candle first, so reverse it
+            df = df.iloc[::-1].reset_index(drop=True)
+            df['close'] = df['close'].astype(float)
+            df['high'] = df['high'].astype(float)
+            df['low'] = df['low'].astype(float)
+            df['volume'] = df['volume'].astype(float)
+            return df
+        else:
+            print("Candle API Response Warning:", data, flush=True)
+            return None
+    except Exception as e:
+        print(f"Error fetching candles: {e}", flush=True)
+        return None
 
-# 2. Calculate Indicators (Supertrend & VWAP)
+# 2. Indicators Calculation
 def calculate_indicators(df):
-    # VWAP Calculation
+    # VWAP
     df['tp'] = (df['high'] + df['low'] + df['close']) / 3
     df['vwap'] = (df['tp'] * df['volume']).cumsum() / df['volume'].cumsum()
 
-    # Supertrend Calculation
+    # Supertrend
     high_low = df['high'] - df['low']
     high_close = np.abs(df['high'] - df['close'].shift())
     low_close = np.abs(df['low'] - df['close'].shift())
@@ -104,7 +111,7 @@ def calculate_indicators(df):
     df['st_direction'] = direction
     return df
 
-# 3. Order & Position Execution Functions
+# 3. Order Place Function
 def place_market_order(side):
     path = "/v2/orders"
     timestamp = str(int(time.time()))
@@ -123,12 +130,11 @@ def place_market_order(side):
     res = requests.post(BASE_URL + path, headers=headers, data=payload, timeout=10)
     return res.json()
 
-# 4. Strategy Main Loop
+# 4. Strategy Engine Loop
 def strategy_loop():
     time.sleep(5)
-    current_position = None  # None, "BUY", or "SELL"
-
-    print("🚀 Strategy 1: Supertrend + VWAP Loop Started!", flush=True)
+    current_position = None
+    print("🚀 STRATEGY ENGINE STARTED SUCCESSFULLY!", flush=True)
 
     while True:
         try:
@@ -141,39 +147,39 @@ def strategy_loop():
                 st_val = last_candle['supertrend']
                 vwap_val = last_candle['vwap']
 
-                print(f"[{time.strftime('%H:%M:%S')}] Close: {close_price} | ST: {round(st_val,2)} | VWAP: {round(vwap_val,2)} | Pos: {current_position}", flush=True)
+                print(f"[{time.strftime('%H:%M:%S')}] BTC: {close_price} | ST: {round(st_val,2)} | VWAP: {round(vwap_val,2)} | Pos: {current_position}", flush=True)
 
-                # --- EXIT CONDITION (VWAP Touch / Cross) ---
+                # --- EXIT RULES ---
                 if current_position == "BUY" and close_price <= vwap_val:
-                    print("🛑 EXIT BUY POSITION: Price touched/below VWAP!", flush=True)
+                    print("🛑 EXIT BUY: Price touched VWAP!", flush=True)
                     place_market_order("sell")
                     current_position = None
 
                 elif current_position == "SELL" and close_price >= vwap_val:
-                    print("🛑 EXIT SELL POSITION: Price touched/above VWAP!", flush=True)
+                    print("🛑 EXIT SELL: Price touched VWAP!", flush=True)
                     place_market_order("buy")
                     current_position = None
 
-                # --- ENTRY CONDITIONS ---
+                # --- ENTRY RULES ---
                 elif current_position is None:
-                    # BUY Trigger: Close > Supertrend
                     if close_price > st_val:
-                        print("🟢 ENTRY BUY: Close > Supertrend!", flush=True)
+                        print("🟢 BUY SIGNAL DETECTED!", flush=True)
                         res = place_market_order("buy")
+                        print("Order Res:", res, flush=True)
                         if res.get('success'):
                             current_position = "BUY"
 
-                    # SELL Trigger: Close < Supertrend
                     elif close_price < st_val:
-                        print("🔴 ENTRY SELL: Close < Supertrend!", flush=True)
+                        print("🔴 SELL SIGNAL DETECTED!", flush=True)
                         res = place_market_order("sell")
+                        print("Order Res:", res, flush=True)
                         if res.get('success'):
                             current_position = "SELL"
 
         except Exception as e:
-            print(f"Loop Exception: {e}", flush=True)
+            print(f"Strategy Loop Exception: {e}", flush=True)
 
-        time.sleep(10) # 10 second loop frequency
+        time.sleep(10)
 
 threading.Thread(target=strategy_loop, daemon=True).start()
 
