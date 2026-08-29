@@ -31,7 +31,7 @@ ST_MULTIPLIER = 1.5
 # 🚀 AAPKI SELECTED 6 INSTRUMENTS KI LIST
 COINS_TO_TRADE = [
     {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "1m",  "lot_size": 0},
-    {"symbol": "XAUUSD",   "product_id": 313,    "timeframe": "1m",  "lot_size": 2},   # Gold
+    {"symbol": "XAUTUSD",   "product_id": 131253,    "timeframe": "1m",  "lot_size": 2},   # Gold (Tether Gold)
     {"symbol": "ETHUSD",   "product_id": 28,     "timeframe": "1m",  "lot_size": 1},   # ETF / ETH
     {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "1m", "lot_size": 0},
     {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "1m", "lot_size": 2}, # Index
