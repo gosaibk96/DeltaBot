@@ -13,18 +13,18 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Pure Supertrend Completed Candle Bot Active!"
+    return "Supertrend Closed-Entry & Touch-Exit Bot Active!"
 
 # =====================================================================
-# ⚙️ EASY CUSTOMIZATION PARAMETERS
+# ⚙️ USER CONFIGURATION
 # =====================================================================
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
 BASE_URL = "https://api.india.delta.exchange"
 
 SYMBOL = "BTCUSD"
-PRODUCT_ID = 27       # BTCUSD Perpetual Contract ID
-TIMEFRAME = "1m"      # Options: "1m", "5m", "15m"
+PRODUCT_ID = 27       # BTCUSD Perpetual Contract ID (Delta India)
+TIMEFRAME = "1m"      # Timeframe
 LOT_SIZE = 1         # 1 Lot = 0.001 BTC
 LEVERAGE = 10         # Leverage
 
@@ -40,7 +40,7 @@ def generate_signature(method, timestamp, path, payload=""):
         hashlib.sha256
     ).hexdigest()
 
-# 1. Fetch Candles
+# 1. Fetch Candle Data
 def fetch_candles():
     try:
         end_time = int(time.time())
@@ -107,16 +107,20 @@ def calculate_supertrend(df):
     df['st_direction'] = direction
     return df
 
-# 3. Order Placement Function
-def place_market_order(side):
+# 3. Flexible Order Placement (Handles Entry & Exit)
+def place_order(side, reduce_only=False):
     path = "/v2/orders"
     timestamp = str(int(time.time()))
-    payload = json.dumps({
+    payload_dict = {
         "product_id": PRODUCT_ID,
         "size": LOT_SIZE,
         "side": side,
         "order_type": "market_order"
-    })
+    }
+    if reduce_only:
+        payload_dict["reduce_only"] = True
+
+    payload = json.dumps(payload_dict)
     headers = {
         'api-key': API_KEY.strip(),
         'signature': generate_signature("POST", timestamp, path, payload),
@@ -126,11 +130,12 @@ def place_market_order(side):
     res = requests.post(BASE_URL + path, headers=headers, data=payload, timeout=10)
     return res.json()
 
-# 4. Strategy Engine (Strict Closed Candle Execution)
+# 4. Strategy Core Loop
 def strategy_loop():
     time.sleep(5)
-    current_position = None
-    print("🚀 SUPERTREND BOT STARTED (STRICT CLOSED CANDLE MODE)!", flush=True)
+    current_position = None   # Tracked Values: None, "BUY", "SELL"
+    last_signal_direction = None
+    print("🚀 SUPERTREND BOT STARTED (CANDLE CLOSE ENTRY | TOUCH EXIT)", flush=True)
 
     while True:
         try:
@@ -138,33 +143,67 @@ def strategy_loop():
             if df is not None and len(df) > ST_PERIOD + 2:
                 df = calculate_supertrend(df)
                 
-                # df.iloc[-2] is the LAST FULLY CLOSED CANDLE (Not running candle)
+                # Live Running Candle Data (For Instant Touch Exit)
+                live_candle = df.iloc[-1]
+                live_price = live_candle['close']
+                
+                # Last Closed Candle Data (For Strict Signal Confirmation)
                 closed_candle = df.iloc[-2]
-                close_price = closed_candle['close']
+                closed_price = closed_candle['close']
                 st_val = closed_candle['supertrend']
+                closed_direction = closed_candle['st_direction']
 
-                print(f"[{time.strftime('%H:%M:%S')}] Closed Candle Price: {close_price} | Supertrend: {round(st_val, 2)} | Active Pos: {current_position}", flush=True)
+                # First Run: Set base trend without trading
+                if last_signal_direction is None:
+                    last_signal_direction = closed_direction
+                    trend_txt = "GREEN" if closed_direction == 1 else "RED"
+                    print(f"⏳ INITIALIZED: Baseline Trend is {trend_txt}. Waiting for fresh signal...", flush=True)
 
-                # BUY TRIGGER (Closed Price > Supertrend)
-                if close_price > st_val and current_position != "BUY":
-                    print("🟢 BUY SIGNAL: Candle Closed Above Supertrend!", flush=True)
-                    res = place_market_order("buy")
-                    print("BUY Executed:", res, flush=True)
-                    if res.get('success'):
-                        current_position = "BUY"
+                print(f"[{time.strftime('%H:%M:%S')}] Live: {live_price} | Closed: {closed_price} | ST: {round(st_val,2)} | Active Pos: {current_position}", flush=True)
 
-                # SELL TRIGGER (Closed Price < Supertrend)
-                elif close_price < st_val and current_position != "SELL":
-                    print("🔴 SELL SIGNAL: Candle Closed Below Supertrend!", flush=True)
-                    res = place_market_order("sell")
-                    print("SELL Executed:", res, flush=True)
-                    if res.get('success'):
-                        current_position = "SELL"
+                # =====================================================
+                # 🛑 STEP 1: INSTANT TOUCH EXIT (USES LIVE RUNNING PRICE)
+                # =====================================================
+                if current_position == "BUY" and live_price <= st_val:
+                    print("⚡ INSTANT EXIT: Price touched/crossed Supertrend line! Closing Long...", flush=True)
+                    res = place_order("sell", reduce_only=True)
+                    print("Exit Long Response:", res, flush=True)
+                    current_position = None
+                    last_signal_direction = -1
+
+                elif current_position == "SELL" and live_price >= st_val:
+                    print("⚡ INSTANT EXIT: Price touched/crossed Supertrend line! Closing Short...", flush=True)
+                    res = place_order("buy", reduce_only=True)
+                    print("Exit Short Response:", res, flush=True)
+                    current_position = None
+                    last_signal_direction = 1
+
+                # =====================================================
+                # 🟢🔴 STEP 2: FRESH ENTRY (REQUIRES CLOSED CANDLE CONFIRMATION)
+                # =====================================================
+                elif current_position is None:
+                    # BUY Signal: Last Closed Candle > Supertrend & Fresh Crossover
+                    if closed_price > st_val and last_signal_direction == -1:
+                        print("🟢 CANDLE CLOSED ABOVE SUPERTREND: Opening BUY Position...", flush=True)
+                        res = place_order("buy", reduce_only=False)
+                        print("BUY Entry Response:", res, flush=True)
+                        if res.get('success'):
+                            current_position = "BUY"
+                            last_signal_direction = 1
+
+                    # SELL Signal: Last Closed Candle < Supertrend & Fresh Crossover
+                    elif closed_price < st_val and last_signal_direction == 1:
+                        print("🔴 CANDLE CLOSED BELOW SUPERTREND: Opening SELL Position...", flush=True)
+                        res = place_order("sell", reduce_only=False)
+                        print("SELL Entry Response:", res, flush=True)
+                        if res.get('success'):
+                            current_position = "SELL"
+                            last_signal_direction = -1
 
         except Exception as e:
-            print(f"Loop Exception: {e}", flush=True)
+            print(f"Strategy Loop Exception: {e}", flush=True)
 
-        time.sleep(15)  # Scan every 15 seconds
+        time.sleep(5)  # Fast 5-second scanner for quick exit execution
 
 threading.Thread(target=strategy_loop, daemon=True).start()
 
