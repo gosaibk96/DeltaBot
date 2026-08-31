@@ -14,6 +14,13 @@ app = Flask(__name__)
 RENDER_APP_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
 DATA_FILE = "trade_history.json"
 
+# Clean state reset on startup
+if os.path.exists(DATA_FILE):
+    try:
+        os.remove(DATA_FILE)
+    except Exception:
+        pass
+
 # =====================================================================
 # ⚙️ USER CONFIGURATION & API KEYS
 # =====================================================================
@@ -25,17 +32,29 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 1},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 5},
     {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "5m",  "lot_size": 200},
-    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "5m",  "lot_size": 10},   # ETH Lot Size = 10
+    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "5m",  "lot_size": 10},
     {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "5m",  "lot_size": 0},
     {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "5m",  "lot_size": 200},
     {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "5m",  "lot_size": 0},
+    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "5m",  "lot_size": 10},
 ]
+
+# Dynamic Contract Multipliers Map (1 Lot Size Value)
+CONTRACT_SIZE_MAP = {
+    "BTCUSD": 0.001,
+    "XAUTUSD": 0.001,
+    "ETHUSD": 0.01,
+    "COINXUSD": 0.01,
+    "SLVONUSD": 0.01,
+    "SOLUSD": 0.1,
+    "LINKUSD": 1.0
+}
 # =====================================================================
 
 # =====================================================================
-# 📊 DATA LOGGER & DASHBOARD STORAGE SYSTEM
+# 📊 DYNAMIC P&L LOGGER
 # =====================================================================
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -57,23 +76,21 @@ def load_data():
     except Exception:
         return {"overall": {"total_trades": 0, "net_pnl": 0.0}, "coins": {}, "history": []}
 
-def log_trade(symbol, trade_type, entry_price, exit_price, lot_size):
+def log_trade(symbol, trade_type, entry_price, exit_price, current_lot_size):
     try:
         data = load_data()
         
-        # Delta Multipliers Fix (BTC/ETH Contracts)
-        contract_value = 1.0
-        if "BTC" in symbol:
-            contract_value = 0.001
-        elif "ETH" in symbol:
-            contract_value = 0.01
-
+        # Get Contract Multiplier per Lot
+        multiplier = CONTRACT_SIZE_MAP.get(symbol, 1.0)
+        
+        # Price Difference
         if trade_type == "BUY":
             price_diff = exit_price - entry_price
         else:
             price_diff = entry_price - exit_price
 
-        pnl = price_diff * lot_size * contract_value
+        # Accurate P&L Calculation
+        pnl = price_diff * current_lot_size * multiplier
 
         if symbol not in data["coins"]:
             data["coins"][symbol] = {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0}
@@ -83,9 +100,8 @@ def log_trade(symbol, trade_type, entry_price, exit_price, lot_size):
             data["coins"][symbol]["wins"] += 1
         else:
             data["coins"][symbol]["losses"] += 1
-            
-        data["coins"][symbol]["pnl"] = round(data["coins"][symbol]["pnl"] + pnl, 2)
 
+        data["coins"][symbol]["pnl"] = round(data["coins"][symbol]["pnl"] + pnl, 2)
         data["overall"]["total_trades"] += 1
         data["overall"]["net_pnl"] = round(data["overall"]["net_pnl"] + pnl, 2)
 
@@ -93,6 +109,7 @@ def log_trade(symbol, trade_type, entry_price, exit_price, lot_size):
             "time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "symbol": symbol,
             "type": trade_type,
+            "lots": current_lot_size,
             "entry": round(entry_price, 2),
             "exit": round(exit_price, 2),
             "pnl": round(pnl, 2)
@@ -105,9 +122,8 @@ def log_trade(symbol, trade_type, entry_price, exit_price, lot_size):
     except Exception as e:
         print(f"[{symbol}] Logging Error: {e}", flush=True)
 
-
 # =====================================================================
-# 🌐 FLASK UI DASHBOARD ROUTE
+# 🌐 FLASK UI DASHBOARD
 # =====================================================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -167,6 +183,7 @@ HTML_TEMPLATE = """
             <th>Time</th>
             <th>Coin</th>
             <th>Type</th>
+            <th>Lots</th>
             <th>Entry</th>
             <th>Exit</th>
             <th>P&L</th>
@@ -176,6 +193,7 @@ HTML_TEMPLATE = """
             <td>{{ trade.time }}</td>
             <td><b>{{ trade.symbol }}</b></td>
             <td>{{ trade.type }}</td>
+            <td>{{ trade.lots }}</td>
             <td>{{ trade.entry }}</td>
             <td>{{ trade.exit }}</td>
             <td class="{{ 'profit' if trade.pnl >= 0 else 'loss' }}">{{ "${:,.2f}".format(trade.pnl) }}</td>
@@ -341,7 +359,7 @@ def run_coin_strategy(coin):
                 t_str = time.strftime('%H:%M:%S')
                 print(f"[{t_str}] {symbol} ({timeframe}) | Live: {live_price} | ST: {round(st_val,2)} | Pos: {current_position}", flush=True)
 
-                # 🛑 STEP 1: INSTANT TOUCH EXIT (Log Trade details to dashboard)
+                # EXIT LOGIC WITH DYNAMIC LOT LOGGING
                 if current_position == "BUY" and live_price <= st_val:
                     print(f"⚡ EXIT [LONG]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
                     res = place_order(product_id, lot_size, "sell", reduce_only=True)
@@ -362,7 +380,7 @@ def run_coin_strategy(coin):
                     time.sleep(5)
                     continue
 
-                # 🟢🔴 STEP 2: FRESH ENTRY
+                # ENTRY LOGIC
                 if current_position is None:
                     if closed_price > st_val and last_signal_direction == -1:
                         print(f"🟢 BUY ENTRY: {symbol} ({timeframe}) Closed Above Supertrend!", flush=True)
@@ -390,7 +408,7 @@ def run_coin_strategy(coin):
         time.sleep(10)
 
 # =====================================================================
-# 🚀 START THREADS & APPLICATION
+# 🚀 START THREADS
 # =====================================================================
 for coin in COINS_TO_TRADE:
     threading.Thread(target=run_coin_strategy, args=(coin,), daemon=True).start()
