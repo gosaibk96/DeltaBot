@@ -61,11 +61,19 @@ def log_trade(symbol, trade_type, entry_price, exit_price, lot_size):
     try:
         data = load_data()
         
-        # Calculate P&L based on Direction
+        # Delta Multipliers Fix (BTC/ETH Contracts)
+        contract_value = 1.0
+        if "BTC" in symbol:
+            contract_value = 0.001
+        elif "ETH" in symbol:
+            contract_value = 0.01
+
         if trade_type == "BUY":
-            pnl = (exit_price - entry_price) * lot_size
+            price_diff = exit_price - entry_price
         else:
-            pnl = (entry_price - exit_price) * lot_size
+            price_diff = entry_price - exit_price
+
+        pnl = price_diff * lot_size * contract_value
 
         if symbol not in data["coins"]:
             data["coins"][symbol] = {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0}
@@ -75,6 +83,7 @@ def log_trade(symbol, trade_type, entry_price, exit_price, lot_size):
             data["coins"][symbol]["wins"] += 1
         else:
             data["coins"][symbol]["losses"] += 1
+            
         data["coins"][symbol]["pnl"] = round(data["coins"][symbol]["pnl"] + pnl, 2)
 
         data["overall"]["total_trades"] += 1
@@ -95,6 +104,7 @@ def log_trade(symbol, trade_type, entry_price, exit_price, lot_size):
             json.dump(data, f, indent=4)
     except Exception as e:
         print(f"[{symbol}] Logging Error: {e}", flush=True)
+
 
 # =====================================================================
 # 🌐 FLASK UI DASHBOARD ROUTE
