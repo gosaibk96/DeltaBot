@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, render_template_string
 import threading
 import time
 import os
@@ -12,10 +12,7 @@ import numpy as np
 app = Flask(__name__)
 
 RENDER_APP_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
-
-@app.route('/')
-def home():
-    return "Multi-Coin Bot Active & Logging!"
+DATA_FILE = "trade_history.json"
 
 # =====================================================================
 # ⚙️ USER CONFIGURATION & API KEYS
@@ -28,15 +25,165 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "15m",  "lot_size": 0},
-    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 200},
-    {"symbol": "ETHUSD",   "product_id": 3136,     "timeframe": "15m",  "lot_size": 10},   # ETH Lot Size = 2
-    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "15m", "lot_size": 0},
-    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m", "lot_size": 100},
-    {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "15m", "lot_size": 0},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 1},
+    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "5m",  "lot_size": 1},
+    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "5m",  "lot_size": 1},   # ETH Lot Size = 10
+    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "5m",  "lot_size": 0},
+    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "5m",  "lot_size": 1},
+    {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "5m",  "lot_size": 0},
 ]
 # =====================================================================
 
+# =====================================================================
+# 📊 DATA LOGGER & DASHBOARD STORAGE SYSTEM
+# =====================================================================
+def load_data():
+    if not os.path.exists(DATA_FILE):
+        initial_data = {
+            "overall": {"total_trades": 0, "net_pnl": 0.0},
+            "coins": {c["symbol"]: {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0} for c in COINS_TO_TRADE},
+            "history": []
+        }
+        with open(DATA_FILE, "w") as f:
+            json.dump(initial_data, f, indent=4)
+        return initial_data
+    try:
+        with open(DATA_FILE, "r") as f:
+            data = json.load(f)
+            for c in COINS_TO_TRADE:
+                if c["symbol"] not in data["coins"]:
+                    data["coins"][c["symbol"]] = {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0}
+            return data
+    except Exception:
+        return {"overall": {"total_trades": 0, "net_pnl": 0.0}, "coins": {}, "history": []}
+
+def log_trade(symbol, trade_type, entry_price, exit_price, lot_size):
+    try:
+        data = load_data()
+        
+        # Calculate P&L based on Direction
+        if trade_type == "BUY":
+            pnl = (exit_price - entry_price) * lot_size
+        else:
+            pnl = (entry_price - exit_price) * lot_size
+
+        if symbol not in data["coins"]:
+            data["coins"][symbol] = {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0}
+
+        data["coins"][symbol]["trades"] += 1
+        if pnl >= 0:
+            data["coins"][symbol]["wins"] += 1
+        else:
+            data["coins"][symbol]["losses"] += 1
+        data["coins"][symbol]["pnl"] = round(data["coins"][symbol]["pnl"] + pnl, 2)
+
+        data["overall"]["total_trades"] += 1
+        data["overall"]["net_pnl"] = round(data["overall"]["net_pnl"] + pnl, 2)
+
+        data["history"].insert(0, {
+            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "symbol": symbol,
+            "type": trade_type,
+            "entry": round(entry_price, 2),
+            "exit": round(exit_price, 2),
+            "pnl": round(pnl, 2)
+        })
+
+        data["history"] = data["history"][:50]
+
+        with open(DATA_FILE, "w") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"[{symbol}] Logging Error: {e}", flush=True)
+
+# =====================================================================
+# 🌐 FLASK UI DASHBOARD ROUTE
+# =====================================================================
+HTML_TEMPLATE = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supertrend Multi-Coin Dashboard</title>
+    <meta http-equiv="refresh" content="10">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+        h1, h2 { text-align: center; color: #38bdf8; }
+        .summary-box { background: #1e293b; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 25px; border: 1px solid #334155; }
+        .summary-title { font-size: 1.1em; color: #94a3b8; }
+        .summary-value { font-size: 2.2em; font-weight: bold; margin-top: 5px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+        .card { background: #1e293b; border-radius: 12px; padding: 18px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .coin-name { font-size: 1.2em; font-weight: bold; color: #facc15; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 10px; }
+        .stat { display: flex; justify-content: space-between; margin: 6px 0; font-size: 0.95em; color: #cbd5e1; }
+        .profit { color: #4ade80; font-weight: bold; }
+        .loss { color: #f87171; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #1e293b; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #334155; font-size: 0.88em; }
+        th { background: #334155; color: #38bdf8; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Supertrend Bot Dashboard</h1>
+    
+    <div class="summary-box">
+        <div class="summary-title">Total Portfolio Net P&L</div>
+        <div class="summary-value {{ 'profit' if data.overall.net_pnl >= 0 else 'loss' }}">
+            {{ "${:,.2f}".format(data.overall.net_pnl) }}
+        </div>
+        <div style="margin-top:6px; color:#94a3b8;">Total Trades Executed: {{ data.overall.total_trades }}</div>
+    </div>
+
+    <h2>📊 Coin-wise Performance Cards</h2>
+    <div class="grid">
+        {% for symbol, stats in data.coins.items() %}
+        <div class="card">
+            <div class="coin-name">{{ symbol }}</div>
+            <div class="stat"><span>Total Trades:</span> <span>{{ stats.trades }}</span></div>
+            <div class="stat"><span>Wins / Losses:</span> <span>{{ stats.wins }} / {{ stats.losses }}</span></div>
+            <div class="stat">
+                <span>Net P&L:</span>
+                <span class="{{ 'profit' if stats.pnl >= 0 else 'loss' }}">
+                    {{ "${:,.2f}".format(stats.pnl) }}
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <h2 style="margin-top: 30px;">📜 Live Executed Trade Logs</h2>
+    <table>
+        <tr>
+            <th>Time</th>
+            <th>Coin</th>
+            <th>Type</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>P&L</th>
+        </tr>
+        {% for trade in data.history %}
+        <tr>
+            <td>{{ trade.time }}</td>
+            <td><b>{{ trade.symbol }}</b></td>
+            <td>{{ trade.type }}</td>
+            <td>{{ trade.entry }}</td>
+            <td>{{ trade.exit }}</td>
+            <td class="{{ 'profit' if trade.pnl >= 0 else 'loss' }}">{{ "${:,.2f}".format(trade.pnl) }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>
+"""
+
+@app.route('/')
+def home():
+    data = load_data()
+    return render_template_string(HTML_TEMPLATE, data=data)
+
+# =====================================================================
+# ⚙️ HELPER & STRATEGY FUNCTIONS
+# =====================================================================
 TF_SECONDS_MAP = {
     "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400
 }
@@ -156,12 +303,12 @@ def run_coin_strategy(coin):
     timeframe = coin["timeframe"]
     lot_size = coin["lot_size"]
 
-    # 🛑 0 Lot wale coins ko skip kardo
     if lot_size <= 0:
         print(f"⏸️ SKIPPED: {symbol} (lot_size is 0)", flush=True)
         return
 
     current_position = None
+    entry_price = 0.0
     last_signal_direction = None
 
     print(f"✅ INITIALIZING: {symbol} | TF: {timeframe} | Lots: {lot_size}", flush=True)
@@ -184,11 +331,12 @@ def run_coin_strategy(coin):
                 t_str = time.strftime('%H:%M:%S')
                 print(f"[{t_str}] {symbol} ({timeframe}) | Live: {live_price} | ST: {round(st_val,2)} | Pos: {current_position}", flush=True)
 
-                # 🛑 STEP 1: INSTANT TOUCH EXIT
+                # 🛑 STEP 1: INSTANT TOUCH EXIT (Log Trade details to dashboard)
                 if current_position == "BUY" and live_price <= st_val:
                     print(f"⚡ EXIT [LONG]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
                     res = place_order(product_id, lot_size, "sell", reduce_only=True)
                     print(f"[{symbol}] Exit Response: {res}", flush=True)
+                    log_trade(symbol, "BUY", entry_price, live_price, lot_size)
                     current_position = None
                     last_signal_direction = 1
                     time.sleep(5)
@@ -198,6 +346,7 @@ def run_coin_strategy(coin):
                     print(f"⚡ EXIT [SHORT]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
                     res = place_order(product_id, lot_size, "buy", reduce_only=True)
                     print(f"[{symbol}] Exit Response: {res}", flush=True)
+                    log_trade(symbol, "SELL", entry_price, live_price, lot_size)
                     current_position = None
                     last_signal_direction = -1
                     time.sleep(5)
@@ -211,6 +360,7 @@ def run_coin_strategy(coin):
                         print(f"[{symbol}] Entry Response: {res}", flush=True)
                         if res.get('success'):
                             current_position = "BUY"
+                            entry_price = live_price
                             last_signal_direction = 1
                             time.sleep(5)
 
@@ -220,6 +370,7 @@ def run_coin_strategy(coin):
                         print(f"[{symbol}] Entry Response: {res}", flush=True)
                         if res.get('success'):
                             current_position = "SELL"
+                            entry_price = live_price
                             last_signal_direction = -1
                             time.sleep(5)
 
@@ -228,7 +379,9 @@ def run_coin_strategy(coin):
 
         time.sleep(10)
 
-# START THREADS
+# =====================================================================
+# 🚀 START THREADS & APPLICATION
+# =====================================================================
 for coin in COINS_TO_TRADE:
     threading.Thread(target=run_coin_strategy, args=(coin,), daemon=True).start()
 
