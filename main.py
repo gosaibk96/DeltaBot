@@ -32,13 +32,13 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 0},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 1},
     {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "1m",  "lot_size": 1},
-    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "5m",  "lot_size": 0},
-    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "5m",  "lot_size": 0},
-    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "5m",  "lot_size": 0},
-    {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "5m",  "lot_size": 0},
-    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "5m",  "lot_size": 0},
+    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "5m",  "lot_size": 1},
+    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "5m",  "lot_size": 1},
+    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "5m",  "lot_size": 1},
+    {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "5m",  "lot_size": 1},
+    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "5m",  "lot_size": 1},
 ]
 
 # Dynamic Contract Multipliers Map (1 Lot Size Value)
