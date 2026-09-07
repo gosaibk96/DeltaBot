@@ -37,7 +37,7 @@ COINS_TO_TRADE = [
     {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 10},
     {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "15m",  "lot_size": 1},
     {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 50},
-    {"symbol": "LINKUSD",  "product_id": 142,    "timeframe": "15m",  "lot_size": 1},
+    {"symbol": "LINKUSD",  "product_id": 15041,    "timeframe": "15m",  "lot_size": 10},
     {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 10},
 ]
 
