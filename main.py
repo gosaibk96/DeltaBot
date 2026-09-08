@@ -21,7 +21,7 @@ if os.path.exists(DATA_FILE):
         pass
 
 # =====================================================================
-# ⚙️ USER CONFIGURATION
+# ⚙️ USER CONFIGURATION (Target, SL & TSL in Points)
 # =====================================================================
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
@@ -31,7 +31,7 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "15m",  "lot_size": 1,   "target_pts": 600.0, "sl_pts": 200.0, "tsl_pts": 10.0},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 5,   "target_pts": 500.0, "sl_pts": 100.0, "tsl_pts": 10.0},
     {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 0, "target_pts": 25.0,  "sl_pts": 15.0,  "tsl_pts": 8.0},
     {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 0,  "target_pts": 40.0,  "sl_pts": 25.0,  "tsl_pts": 12.0},
     {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "15m",  "lot_size": 0,   "target_pts": 5.0,   "sl_pts": 3.0,   "tsl_pts": 1.5},
@@ -111,8 +111,9 @@ def log_trade(symbol, trade_type, entry_time_str, entry_price, exit_price, curre
 
         with open(DATA_FILE, "w") as f:
             json.dump(data, f, indent=4)
+        print(f"📝 [LOGGED] {symbol} {trade_type} Trade Saved. PnL: {round(pnl, 2)}", flush=True)
     except Exception as e:
-        print(f"[{symbol}] Logging Error: {e}", flush=True)
+        print(f"❌ [{symbol}] Logging Error: {e}", flush=True)
 
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -241,7 +242,8 @@ def fetch_candles(symbol, timeframe):
                 df['volume'] = df['volume'].astype(float)
                 return df
         return None
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ [{symbol}] Candle Fetch Error: {e}", flush=True)
         return None
 
 def calculate_supertrend(df):
@@ -306,8 +308,11 @@ def place_order(product_id, lot_size, side, reduce_only=False):
             'Content-Type': 'application/json'
         }
         res = requests.post(BASE_URL + path, headers=headers, data=payload, timeout=10)
-        return res.json()
-    except Exception:
+        res_json = res.json()
+        print(f"📡 [API ORDER RESPONSE] Side: {side.upper()} | Success: {res_json.get('success')} | Res: {res_json}", flush=True)
+        return res_json
+    except Exception as e:
+        print(f"❌ [API ORDER ERROR] {e}", flush=True)
         return {}
 
 def run_coin_strategy(coin):
@@ -357,15 +362,16 @@ def run_coin_strategy(coin):
                         new_tsl = highest_price - tsl_pts
                         if new_tsl > current_sl:
                             current_sl = new_tsl
+                            print(f"📈 [TSL UPDATED - LONG] {symbol}: New SL -> {current_sl}", flush=True)
 
                     if live_price >= current_target:
-                        print(f"🎯 TARGET HIT [LONG]: {symbol} at {live_price}", flush=True)
+                        print(f"🎯 TARGET HIT [LONG]: {symbol} at {live_price} (Target was {current_target})", flush=True)
                         res = place_order(product_id, lot_size, "sell", reduce_only=True)
                         if res.get('success'):
                             log_trade(symbol, "BUY", entry_time_str, entry_price, live_price, lot_size)
                             current_position = None
                     elif live_price <= current_sl:
-                        print(f"🛑 STOP LOSS / TSL HIT [LONG]: {symbol} at {live_price}", flush=True)
+                        print(f"🛑 STOP LOSS / TSL HIT [LONG]: {symbol} at {live_price} (SL was {current_sl})", flush=True)
                         res = place_order(product_id, lot_size, "sell", reduce_only=True)
                         if res.get('success'):
                             log_trade(symbol, "BUY", entry_time_str, entry_price, live_price, lot_size)
@@ -377,15 +383,16 @@ def run_coin_strategy(coin):
                         new_tsl = lowest_price + tsl_pts
                         if new_tsl < current_sl:
                             current_sl = new_tsl
+                            print(f"📉 [TSL UPDATED - SHORT] {symbol}: New SL -> {current_sl}", flush=True)
 
                     if live_price <= current_target:
-                        print(f"🎯 TARGET HIT [SHORT]: {symbol} at {live_price}", flush=True)
+                        print(f"🎯 TARGET HIT [SHORT]: {symbol} at {live_price} (Target was {current_target})", flush=True)
                         res = place_order(product_id, lot_size, "buy", reduce_only=True)
                         if res.get('success'):
                             log_trade(symbol, "SELL", entry_time_str, entry_price, live_price, lot_size)
                             current_position = None
                     elif live_price >= current_sl:
-                        print(f"🛑 STOP LOSS / TSL HIT [SHORT]: {symbol} at {live_price}", flush=True)
+                        print(f"🛑 STOP LOSS / TSL HIT [SHORT]: {symbol} at {live_price} (SL was {current_sl})", flush=True)
                         res = place_order(product_id, lot_size, "buy", reduce_only=True)
                         if res.get('success'):
                             log_trade(symbol, "SELL", entry_time_str, entry_price, live_price, lot_size)
@@ -396,7 +403,7 @@ def run_coin_strategy(coin):
                 # ==========================================
                 if current_position is None:
                     if closed_price > st_val and last_signal_direction == -1:
-                        print(f"🟢 BUY ENTRY: {symbol} Closed Above Supertrend!", flush=True)
+                        print(f"🟢 BUY ENTRY SIGNAL: {symbol} Closed Above Supertrend at {live_price}!", flush=True)
                         res = place_order(product_id, lot_size, "buy", reduce_only=False)
                         if res.get('success'):
                             current_position = "BUY"
@@ -406,10 +413,11 @@ def run_coin_strategy(coin):
                             current_target = entry_price + target_pts
                             current_sl = entry_price - sl_pts
                             last_signal_direction = 1
+                            print(f"✅ BUY POSITION OPENED | Entry: {entry_price} | Target: {current_target} | SL: {current_sl}", flush=True)
                             time.sleep(5)
 
                     elif closed_price < st_val and last_signal_direction == 1:
-                        print(f"🔴 SELL ENTRY: {symbol} Closed Below Supertrend!", flush=True)
+                        print(f"🔴 SELL ENTRY SIGNAL: {symbol} Closed Below Supertrend at {live_price}!", flush=True)
                         res = place_order(product_id, lot_size, "sell", reduce_only=False)
                         if res.get('success'):
                             current_position = "SELL"
@@ -419,10 +427,11 @@ def run_coin_strategy(coin):
                             current_target = entry_price - target_pts
                             current_sl = entry_price + sl_pts
                             last_signal_direction = -1
+                            print(f"✅ SELL POSITION OPENED | Entry: {entry_price} | Target: {current_target} | SL: {current_sl}", flush=True)
                             time.sleep(5)
 
         except Exception as e:
-            print(f"[{symbol}] Loop Exception: {e}", flush=True)
+            print(f"❌ [{symbol}] Loop Exception: {e}", flush=True)
 
         time.sleep(10)
 
