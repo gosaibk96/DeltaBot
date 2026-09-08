@@ -14,7 +14,6 @@ app = Flask(__name__)
 RENDER_APP_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
 DATA_FILE = "trade_history.json"
 
-# Clean state reset on startup
 if os.path.exists(DATA_FILE):
     try:
         os.remove(DATA_FILE)
@@ -22,7 +21,7 @@ if os.path.exists(DATA_FILE):
         pass
 
 # =====================================================================
-# ⚙️ USER CONFIGURATION & API KEYS
+# ⚙️ USER CONFIGURATION
 # =====================================================================
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
@@ -32,16 +31,15 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "15m",  "lot_size": 5},
-    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 200},
-    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 10},
-    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "15m",  "lot_size": 1},
-    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 50},
-    {"symbol": "LINKUSD",  "product_id": 15041,    "timeframe": "15m",  "lot_size": 10},
-    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 10},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "15m",  "lot_size": 1,   "target_pts": 600.0, "sl_pts": 200.0, "tsl_pts": 10.0},
+    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 0, "target_pts": 25.0,  "sl_pts": 15.0,  "tsl_pts": 8.0},
+    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 0,  "target_pts": 40.0,  "sl_pts": 25.0,  "tsl_pts": 12.0},
+    {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "15m",  "lot_size": 0,   "target_pts": 5.0,   "sl_pts": 3.0,   "tsl_pts": 1.5},
+    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 0,  "target_pts": 20.0,  "sl_pts": 12.0,  "tsl_pts": 6.0},
+    {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 0,  "target_pts": 0.50,  "sl_pts": 0.30,  "tsl_pts": 0.15},
+    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 0,  "target_pts": 0.40,  "sl_pts": 0.25,  "tsl_pts": 0.12},
 ]
 
-# Dynamic Contract Multipliers Map (1 Lot Size Value)
 CONTRACT_SIZE_MAP = {
     "BTCUSD": 0.001,
     "XAUTUSD": 0.001,
@@ -53,9 +51,6 @@ CONTRACT_SIZE_MAP = {
 }
 # =====================================================================
 
-# =====================================================================
-# 📊 DYNAMIC P&L LOGGER
-# =====================================================================
 def load_data():
     if not os.path.exists(DATA_FILE):
         initial_data = {
@@ -76,20 +71,16 @@ def load_data():
     except Exception:
         return {"overall": {"total_trades": 0, "net_pnl": 0.0}, "coins": {}, "history": []}
 
-def log_trade(symbol, trade_type, entry_price, exit_price, current_lot_size):
+def log_trade(symbol, trade_type, entry_time_str, entry_price, exit_price, current_lot_size):
     try:
         data = load_data()
-        
-        # Get Contract Multiplier per Lot
         multiplier = CONTRACT_SIZE_MAP.get(symbol, 1.0)
         
-        # Price Difference
         if trade_type == "BUY":
             price_diff = exit_price - entry_price
         else:
             price_diff = entry_price - exit_price
 
-        # Accurate P&L Calculation
         pnl = price_diff * current_lot_size * multiplier
 
         if symbol not in data["coins"]:
@@ -106,7 +97,8 @@ def log_trade(symbol, trade_type, entry_price, exit_price, current_lot_size):
         data["overall"]["net_pnl"] = round(data["overall"]["net_pnl"] + pnl, 2)
 
         data["history"].insert(0, {
-            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "entry_time": entry_time_str,
+            "exit_time": time.strftime("%Y-%m-%d %H:%M:%S"),
             "symbol": symbol,
             "type": trade_type,
             "lots": current_lot_size,
@@ -122,14 +114,11 @@ def log_trade(symbol, trade_type, entry_price, exit_price, current_lot_size):
     except Exception as e:
         print(f"[{symbol}] Logging Error: {e}", flush=True)
 
-# =====================================================================
-# 🌐 FLASK UI DASHBOARD
-# =====================================================================
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Supertrend Multi-Coin Dashboard</title>
+    <title>Supertrend Bot Dashboard</title>
     <meta http-equiv="refresh" content="10">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -145,7 +134,7 @@ HTML_TEMPLATE = """
         .profit { color: #4ade80; font-weight: bold; }
         .loss { color: #f87171; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #1e293b; border-radius: 8px; overflow: hidden; }
-        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #334155; font-size: 0.88em; }
+        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #334155; font-size: 0.85em; }
         th { background: #334155; color: #38bdf8; }
     </style>
 </head>
@@ -180,7 +169,8 @@ HTML_TEMPLATE = """
     <h2 style="margin-top: 30px;">📜 Live Executed Trade Logs</h2>
     <table>
         <tr>
-            <th>Time</th>
+            <th>Entry Time</th>
+            <th>Exit Time</th>
             <th>Coin</th>
             <th>Type</th>
             <th>Lots</th>
@@ -190,7 +180,8 @@ HTML_TEMPLATE = """
         </tr>
         {% for trade in data.history %}
         <tr>
-            <td>{{ trade.time }}</td>
+            <td>{{ trade.entry_time }}</td>
+            <td>{{ trade.exit_time }}</td>
             <td><b>{{ trade.symbol }}</b></td>
             <td>{{ trade.type }}</td>
             <td>{{ trade.lots }}</td>
@@ -209,9 +200,6 @@ def home():
     data = load_data()
     return render_template_string(HTML_TEMPLATE, data=data)
 
-# =====================================================================
-# ⚙️ HELPER & STRATEGY FUNCTIONS
-# =====================================================================
 TF_SECONDS_MAP = {
     "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400
 }
@@ -230,9 +218,8 @@ def keep_awake():
         if RENDER_APP_URL:
             try:
                 requests.get(RENDER_APP_URL, timeout=5)
-                print("⏰ Keep-Alive Ping Sent!", flush=True)
-            except Exception as e:
-                print(f"Keep-Alive Error: {e}", flush=True)
+            except Exception:
+                pass
 
 def fetch_candles(symbol, timeframe):
     try:
@@ -254,8 +241,7 @@ def fetch_candles(symbol, timeframe):
                 df['volume'] = df['volume'].astype(float)
                 return df
         return None
-    except Exception as e:
-        print(f"[{symbol}] Candle Exception: {e}", flush=True)
+    except Exception:
         return None
 
 def calculate_supertrend(df):
@@ -321,8 +307,7 @@ def place_order(product_id, lot_size, side, reduce_only=False):
         }
         res = requests.post(BASE_URL + path, headers=headers, data=payload, timeout=10)
         return res.json()
-    except Exception as e:
-        print(f"Order Exception: {e}", flush=True)
+    except Exception:
         return {}
 
 def run_coin_strategy(coin):
@@ -330,16 +315,23 @@ def run_coin_strategy(coin):
     product_id = coin["product_id"]
     timeframe = coin["timeframe"]
     lot_size = coin["lot_size"]
+    target_pts = coin["target_pts"]
+    sl_pts = coin["sl_pts"]
+    tsl_pts = coin["tsl_pts"]
 
     if lot_size <= 0:
-        print(f"⏸️ SKIPPED: {symbol} (lot_size is 0)", flush=True)
         return
 
     current_position = None
     entry_price = 0.0
+    entry_time_str = ""
+    current_sl = 0.0
+    current_target = 0.0
+    highest_price = 0.0
+    lowest_price = 0.0
     last_signal_direction = None
 
-    print(f"✅ INITIALIZING: {symbol} | TF: {timeframe} | Lots: {lot_size}", flush=True)
+    print(f"✅ INITIALIZING: {symbol} | Target Pts: {target_pts} | SL Pts: {sl_pts} | TSL Pts: {tsl_pts}", flush=True)
 
     while True:
         try:
@@ -356,49 +348,76 @@ def run_coin_strategy(coin):
                 if last_signal_direction is None:
                     last_signal_direction = closed_direction
 
-                t_str = time.strftime('%H:%M:%S')
-                print(f"[{t_str}] {symbol} ({timeframe}) | Live: {live_price} | ST: {round(st_val,2)} | Pos: {current_position}", flush=True)
+                # ==========================================
+                # EXIT & TRAILING SL LOGIC
+                # ==========================================
+                if current_position == "BUY":
+                    if live_price > highest_price:
+                        highest_price = live_price
+                        new_tsl = highest_price - tsl_pts
+                        if new_tsl > current_sl:
+                            current_sl = new_tsl
 
-                # EXIT LOGIC WITH DYNAMIC LOT LOGGING
-                if current_position == "BUY" and live_price <= st_val:
-                    print(f"⚡ EXIT [LONG]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
-                    res = place_order(product_id, lot_size, "sell", reduce_only=True)
-                    print(f"[{symbol}] Exit Response: {res}", flush=True)
-                    log_trade(symbol, "BUY", entry_price, live_price, lot_size)
-                    current_position = None
-                    last_signal_direction = 1
-                    time.sleep(5)
-                    continue
+                    if live_price >= current_target:
+                        print(f"🎯 TARGET HIT [LONG]: {symbol} at {live_price}", flush=True)
+                        res = place_order(product_id, lot_size, "sell", reduce_only=True)
+                        if res.get('success'):
+                            log_trade(symbol, "BUY", entry_time_str, entry_price, live_price, lot_size)
+                            current_position = None
+                    elif live_price <= current_sl:
+                        print(f"🛑 STOP LOSS / TSL HIT [LONG]: {symbol} at {live_price}", flush=True)
+                        res = place_order(product_id, lot_size, "sell", reduce_only=True)
+                        if res.get('success'):
+                            log_trade(symbol, "BUY", entry_time_str, entry_price, live_price, lot_size)
+                            current_position = None
 
-                elif current_position == "SELL" and live_price >= st_val:
-                    print(f"⚡ EXIT [SHORT]: {symbol} ({timeframe}) touched Supertrend!", flush=True)
-                    res = place_order(product_id, lot_size, "buy", reduce_only=True)
-                    print(f"[{symbol}] Exit Response: {res}", flush=True)
-                    log_trade(symbol, "SELL", entry_price, live_price, lot_size)
-                    current_position = None
-                    last_signal_direction = -1
-                    time.sleep(5)
-                    continue
+                elif current_position == "SELL":
+                    if live_price < lowest_price:
+                        lowest_price = live_price
+                        new_tsl = lowest_price + tsl_pts
+                        if new_tsl < current_sl:
+                            current_sl = new_tsl
 
+                    if live_price <= current_target:
+                        print(f"🎯 TARGET HIT [SHORT]: {symbol} at {live_price}", flush=True)
+                        res = place_order(product_id, lot_size, "buy", reduce_only=True)
+                        if res.get('success'):
+                            log_trade(symbol, "SELL", entry_time_str, entry_price, live_price, lot_size)
+                            current_position = None
+                    elif live_price >= current_sl:
+                        print(f"🛑 STOP LOSS / TSL HIT [SHORT]: {symbol} at {live_price}", flush=True)
+                        res = place_order(product_id, lot_size, "buy", reduce_only=True)
+                        if res.get('success'):
+                            log_trade(symbol, "SELL", entry_time_str, entry_price, live_price, lot_size)
+                            current_position = None
+
+                # ==========================================
                 # ENTRY LOGIC
+                # ==========================================
                 if current_position is None:
                     if closed_price > st_val and last_signal_direction == -1:
-                        print(f"🟢 BUY ENTRY: {symbol} ({timeframe}) Closed Above Supertrend!", flush=True)
+                        print(f"🟢 BUY ENTRY: {symbol} Closed Above Supertrend!", flush=True)
                         res = place_order(product_id, lot_size, "buy", reduce_only=False)
-                        print(f"[{symbol}] Entry Response: {res}", flush=True)
                         if res.get('success'):
                             current_position = "BUY"
+                            entry_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
                             entry_price = live_price
+                            highest_price = live_price
+                            current_target = entry_price + target_pts
+                            current_sl = entry_price - sl_pts
                             last_signal_direction = 1
                             time.sleep(5)
 
                     elif closed_price < st_val and last_signal_direction == 1:
-                        print(f"🔴 SELL ENTRY: {symbol} ({timeframe}) Closed Below Supertrend!", flush=True)
+                        print(f"🔴 SELL ENTRY: {symbol} Closed Below Supertrend!", flush=True)
                         res = place_order(product_id, lot_size, "sell", reduce_only=False)
-                        print(f"[{symbol}] Entry Response: {res}", flush=True)
                         if res.get('success'):
                             current_position = "SELL"
+                            entry_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
                             entry_price = live_price
+                            lowest_price = live_price
+                            current_target = entry_price - target_pts
+                            current_sl = entry_price + sl_pts
                             last_signal_direction = -1
                             time.sleep(5)
 
@@ -407,9 +426,6 @@ def run_coin_strategy(coin):
 
         time.sleep(10)
 
-# =====================================================================
-# 🚀 START THREADS
-# =====================================================================
 for coin in COINS_TO_TRADE:
     threading.Thread(target=run_coin_strategy, args=(coin,), daemon=True).start()
 
