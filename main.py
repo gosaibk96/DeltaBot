@@ -31,9 +31,9 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 5,   "target_pts": 500.0, "sl_pts": 100.0, "tsl_pts": 10.0},
-    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 0, "target_pts": 25.0,  "sl_pts": 15.0,  "tsl_pts": 8.0},
-    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 0,  "target_pts": 40.0,  "sl_pts": 25.0,  "tsl_pts": 12.0},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 2,   "target_pts": 500.0, "sl_pts": 100.0, "tsl_pts": 30.0},
+    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "5m",  "lot_size": 50, "target_pts": 25.0,  "sl_pts": 5.0,  "tsl_pts": 0.5},
+    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "5m",  "lot_size": 5,  "target_pts": 50.0,  "sl_pts": 10.0,  "tsl_pts": 1.0},
     {"symbol": "SOLUSD",   "product_id": 120,    "timeframe": "15m",  "lot_size": 0,   "target_pts": 5.0,   "sl_pts": 3.0,   "tsl_pts": 1.5},
     {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 0,  "target_pts": 20.0,  "sl_pts": 12.0,  "tsl_pts": 6.0},
     {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 0,  "target_pts": 0.50,  "sl_pts": 0.30,  "tsl_pts": 0.15},
@@ -352,6 +352,9 @@ def run_coin_strategy(coin):
 
                 if last_signal_direction is None:
                     last_signal_direction = closed_direction
+
+                # 👉 CONTINUOUS STATUS PRINT (Har loop mein price aur position dikhegi)
+                print(f"📊 [{symbol}] Price: {live_price} | ST: {round(st_val, 2)} | Pos: {current_position or 'NONE'}", flush=True)
 
                 # ==========================================
                 # EXIT & TRAILING SL LOGIC
