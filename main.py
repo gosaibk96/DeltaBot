@@ -21,7 +21,7 @@ if os.path.exists(DATA_FILE):
         pass
 
 # =====================================================================
-# ⚙️ USER CONFIGURATION (Target, SL & TSL in Points)
+# ⚙️ USER CONFIGURATION (Target & SL/Trailing Distance in Points)
 # =====================================================================
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
 API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
@@ -31,13 +31,13 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 1,   "target_pts": 750.0, "sl_pts": 250.0, "tsl_pts": 30.0},
-    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 100, "target_pts": 30.0,  "sl_pts": 10.0,  "tsl_pts": 2.0},
-    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 10,  "target_pts": 30.0,  "sl_pts": 10.0,  "tsl_pts": 2.0},
-    {"symbol": "SOLUSD",   "product_id": 14823,  "timeframe": "15m",  "lot_size": 2,   "target_pts": 1.50,  "sl_pts": 0.50,  "tsl_pts": 0.10},
-    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 0,   "target_pts": 20.0,  "sl_pts": 12.0,  "tsl_pts": 6.0},
-    {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 10,  "target_pts": 0.450, "sl_pts": 0.150, "tsl_pts": 0.10},
-    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 40,  "target_pts": 1.00,  "sl_pts": 0.25,  "tsl_pts": 0.05},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 2,   "target_pts": 750.0, "sl_pts": 250.0},
+    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 100, "target_pts": 30.0,  "sl_pts": 10.0},
+    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 10,  "target_pts": 30.0,  "sl_pts": 10.0},
+    {"symbol": "SOLUSD",   "product_id": 14823,  "timeframe": "15m",  "lot_size": 2,   "target_pts": 1.50,  "sl_pts": 0.50},
+    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 0,   "target_pts": 20.0,  "sl_pts": 12.0},
+    {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 10,  "target_pts": 0.450, "sl_pts": 0.150},
+    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 40,  "target_pts": 1.00,  "sl_pts": 0.25},
 ]
 
 CONTRACT_SIZE_MAP = {
@@ -322,7 +322,6 @@ def run_coin_strategy(coin):
     lot_size = coin["lot_size"]
     target_pts = coin["target_pts"]
     sl_pts = coin["sl_pts"]
-    tsl_pts = coin["tsl_pts"]
 
     if lot_size <= 0:
         return
@@ -336,7 +335,7 @@ def run_coin_strategy(coin):
     lowest_price = 0.0
     last_signal_direction = None
 
-    print(f"✅ INITIALIZING: {symbol} | Target Pts: {target_pts} | SL Pts: {sl_pts} | TSL Pts: {tsl_pts}", flush=True)
+    print(f"✅ INITIALIZING: {symbol} | Target Pts: {target_pts} | Fixed SL & Trailing Gap: {sl_pts}", flush=True)
 
     while True:
         try:
@@ -356,18 +355,16 @@ def run_coin_strategy(coin):
                 print(f"📊 [{symbol}] Price: {live_price} | ST: {round(st_val, 2)} | Pos: {current_position or 'NONE'}", flush=True)
 
                 # ==========================================
-                # EXIT & FIXED / TRAILING SL LOGIC
+                # EXIT & CONTINUOUS TRAILING SL LOGIC (SL Gap Maintained)
                 # ==========================================
                 if current_position == "BUY":
                     if live_price > highest_price:
                         highest_price = live_price
-
-                    # TSL tabhi trail karega jab price entry se 'tsl_pts' profit mein chale jaye
-                    if highest_price >= entry_price + tsl_pts:
-                        new_tsl = highest_price - tsl_pts
+                        # Trailing SL shifts dynamically maintaining 'sl_pts' distance from peak price
+                        new_tsl = highest_price - sl_pts
                         if new_tsl > current_sl:
                             current_sl = new_tsl
-                            print(f"📈 [TSL UPDATED - LONG] {symbol}: New SL -> {current_sl}", flush=True)
+                            print(f"📈 [TRAILING SL - LONG] {symbol}: New SL -> {current_sl} (Gap: {sl_pts})", flush=True)
 
                     if live_price >= current_target:
                         print(f"🎯 TARGET HIT [LONG]: {symbol} at {live_price} (Target was {current_target})", flush=True)
@@ -385,13 +382,11 @@ def run_coin_strategy(coin):
                 elif current_position == "SELL":
                     if live_price < lowest_price:
                         lowest_price = live_price
-
-                    # TSL tabhi trail karega jab price entry se 'tsl_pts' profit mein chale jaye
-                    if lowest_price <= entry_price - tsl_pts:
-                        new_tsl = lowest_price + tsl_pts
+                        # Trailing SL shifts dynamically maintaining 'sl_pts' distance from lowest price
+                        new_tsl = lowest_price + sl_pts
                         if new_tsl < current_sl:
                             current_sl = new_tsl
-                            print(f"📉 [TSL UPDATED - SHORT] {symbol}: New SL -> {current_sl}", flush=True)
+                            print(f"📉 [TRAILING SL - SHORT] {symbol}: New SL -> {current_sl} (Gap: {sl_pts})", flush=True)
 
                     if live_price <= current_target:
                         print(f"🎯 TARGET HIT [SHORT]: {symbol} at {live_price} (Target was {current_target})", flush=True)
@@ -407,7 +402,7 @@ def run_coin_strategy(coin):
                             current_position = None
 
                 # ==========================================
-                # ENTRY LOGIC (Fixed Crossover / Direction Check)
+                # ENTRY LOGIC (Crossover / Trend Direction Change)
                 # ==========================================
                 if current_position is None:
                     if closed_direction == 1 and last_signal_direction != 1:
@@ -419,9 +414,9 @@ def run_coin_strategy(coin):
                             entry_price = live_price
                             highest_price = live_price
                             current_target = entry_price + target_pts
-                            current_sl = entry_price - sl_pts  # Fixed SL set properly based on user config
+                            current_sl = entry_price - sl_pts  # Initial SL distance equals sl_pts
                             last_signal_direction = 1
-                            print(f"✅ BUY POSITION OPENED | Entry: {entry_price} | Target: {current_target} | Fixed SL: {current_sl}", flush=True)
+                            print(f"✅ BUY POSITION OPENED | Entry: {entry_price} | Target: {current_target} | Initial SL: {current_sl}", flush=True)
                             time.sleep(5)
 
                     elif closed_direction == -1 and last_signal_direction != -1:
@@ -433,12 +428,11 @@ def run_coin_strategy(coin):
                             entry_price = live_price
                             lowest_price = live_price
                             current_target = entry_price - target_pts
-                            current_sl = entry_price + sl_pts  # Fixed SL set properly based on user config
+                            current_sl = entry_price + sl_pts  # Initial SL distance equals sl_pts
                             last_signal_direction = -1
-                            print(f"✅ SELL POSITION OPENED | Entry: {entry_price} | Target: {current_target} | Fixed SL: {current_sl}", flush=True)
+                            print(f"✅ SELL POSITION OPENED | Entry: {entry_price} | Target: {current_target} | Initial SL: {current_sl}", flush=True)
                             time.sleep(5)
 
-                    # Update direction tracker even if no trade was taken to prevent missing future signals
                     if closed_direction != last_signal_direction:
                         last_signal_direction = closed_direction
 
