@@ -31,12 +31,12 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 8,   "target_pts": 750.0, "sl_pts": 250.0, "tsl_pts": 30.0},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 1,   "target_pts": 750.0, "sl_pts": 250.0, "tsl_pts": 30.0},
     {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 100, "target_pts": 30.0,  "sl_pts": 10.0,  "tsl_pts": 2.0},
     {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 10,  "target_pts": 30.0,  "sl_pts": 10.0,  "tsl_pts": 2.0},
-    {"symbol": "SOLUSD",   "product_id": 14823,    "timeframe": "15m",  "lot_size": 2,   "target_pts": 1.50,   "sl_pts": 0.50,   "tsl_pts": 0.10},
-    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 0,  "target_pts": 20.0,  "sl_pts": 12.0,  "tsl_pts": 6.0},
-    {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 10,  "target_pts": 0.450,  "sl_pts": 0.150,  "tsl_pts": 0.10},
+    {"symbol": "SOLUSD",   "product_id": 14823,  "timeframe": "15m",  "lot_size": 2,   "target_pts": 1.50,  "sl_pts": 0.50,  "tsl_pts": 0.10},
+    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 0,   "target_pts": 20.0,  "sl_pts": 12.0,  "tsl_pts": 6.0},
+    {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 10,  "target_pts": 0.450, "sl_pts": 0.150, "tsl_pts": 0.10},
     {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 40,  "target_pts": 1.00,  "sl_pts": 0.25,  "tsl_pts": 0.05},
 ]
 
@@ -346,22 +346,24 @@ def run_coin_strategy(coin):
                 
                 live_price = df.iloc[-1]['close']
                 closed_candle = df.iloc[-2]
-                closed_price = closed_candle['close']
                 st_val = closed_candle['supertrend']
                 closed_direction = closed_candle['st_direction']
 
                 if last_signal_direction is None:
                     last_signal_direction = closed_direction
 
-                # 👉 CONTINUOUS STATUS PRINT (Har loop mein price aur position dikhegi)
+                # Continuous status print
                 print(f"📊 [{symbol}] Price: {live_price} | ST: {round(st_val, 2)} | Pos: {current_position or 'NONE'}", flush=True)
 
                 # ==========================================
-                # EXIT & TRAILING SL LOGIC
+                # EXIT & FIXED / TRAILING SL LOGIC
                 # ==========================================
                 if current_position == "BUY":
                     if live_price > highest_price:
                         highest_price = live_price
+
+                    # TSL tabhi trail karega jab price entry se 'tsl_pts' profit mein chale jaye
+                    if highest_price >= entry_price + tsl_pts:
                         new_tsl = highest_price - tsl_pts
                         if new_tsl > current_sl:
                             current_sl = new_tsl
@@ -383,6 +385,9 @@ def run_coin_strategy(coin):
                 elif current_position == "SELL":
                     if live_price < lowest_price:
                         lowest_price = live_price
+
+                    # TSL tabhi trail karega jab price entry se 'tsl_pts' profit mein chale jaye
+                    if lowest_price <= entry_price - tsl_pts:
                         new_tsl = lowest_price + tsl_pts
                         if new_tsl < current_sl:
                             current_sl = new_tsl
@@ -402,11 +407,11 @@ def run_coin_strategy(coin):
                             current_position = None
 
                 # ==========================================
-                # ENTRY LOGIC
+                # ENTRY LOGIC (Fixed Crossover / Direction Check)
                 # ==========================================
                 if current_position is None:
-                    if closed_price > st_val and last_signal_direction == -1:
-                        print(f"🟢 BUY ENTRY SIGNAL: {symbol} Closed Above Supertrend at {live_price}!", flush=True)
+                    if closed_direction == 1 and last_signal_direction != 1:
+                        print(f"🟢 BUY ENTRY SIGNAL: {symbol} Direction Changed to Bullish at {live_price}!", flush=True)
                         res = place_order(product_id, lot_size, "buy", reduce_only=False)
                         if res.get('success'):
                             current_position = "BUY"
@@ -414,13 +419,13 @@ def run_coin_strategy(coin):
                             entry_price = live_price
                             highest_price = live_price
                             current_target = entry_price + target_pts
-                            current_sl = entry_price - sl_pts
+                            current_sl = entry_price - sl_pts  # Fixed SL set properly based on user config
                             last_signal_direction = 1
-                            print(f"✅ BUY POSITION OPENED | Entry: {entry_price} | Target: {current_target} | SL: {current_sl}", flush=True)
+                            print(f"✅ BUY POSITION OPENED | Entry: {entry_price} | Target: {current_target} | Fixed SL: {current_sl}", flush=True)
                             time.sleep(5)
 
-                    elif closed_price < st_val and last_signal_direction == 1:
-                        print(f"🔴 SELL ENTRY SIGNAL: {symbol} Closed Below Supertrend at {live_price}!", flush=True)
+                    elif closed_direction == -1 and last_signal_direction != -1:
+                        print(f"🔴 SELL ENTRY SIGNAL: {symbol} Direction Changed to Bearish at {live_price}!", flush=True)
                         res = place_order(product_id, lot_size, "sell", reduce_only=False)
                         if res.get('success'):
                             current_position = "SELL"
@@ -428,10 +433,14 @@ def run_coin_strategy(coin):
                             entry_price = live_price
                             lowest_price = live_price
                             current_target = entry_price - target_pts
-                            current_sl = entry_price + sl_pts
+                            current_sl = entry_price + sl_pts  # Fixed SL set properly based on user config
                             last_signal_direction = -1
-                            print(f"✅ SELL POSITION OPENED | Entry: {entry_price} | Target: {current_target} | SL: {current_sl}", flush=True)
+                            print(f"✅ SELL POSITION OPENED | Entry: {entry_price} | Target: {current_target} | Fixed SL: {current_sl}", flush=True)
                             time.sleep(5)
+
+                    # Update direction tracker even if no trade was taken to prevent missing future signals
+                    if closed_direction != last_signal_direction:
+                        last_signal_direction = closed_direction
 
         except Exception as e:
             print(f"❌ [{symbol}] Loop Exception: {e}", flush=True)
