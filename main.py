@@ -31,13 +31,13 @@ ST_PERIOD = 10
 ST_MULTIPLIER = 1.5
 
 COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "5m",  "lot_size": 2,   "target_pts": 750.0, "sl_pts": 250.0},
-    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 100, "target_pts": 30.0,  "sl_pts": 10.0},
-    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 10,  "target_pts": 30.0,  "sl_pts": 10.0},
-    {"symbol": "SOLUSD",   "product_id": 14823,  "timeframe": "15m",  "lot_size": 2,   "target_pts": 1.50,  "sl_pts": 0.50},
+    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "15m",  "lot_size": 0,   "target_pts": 750.0, "sl_pts": 250.0},
+    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 300, "target_pts": 10.0,  "sl_pts": 10.0},
+    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 20,  "target_pts": 10.0,  "sl_pts": 10.0},
+    {"symbol": "SOLUSD",   "product_id": 14823,  "timeframe": "15m",  "lot_size": 0,   "target_pts": 1.50,  "sl_pts": 0.50},
     {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 0,   "target_pts": 20.0,  "sl_pts": 12.0},
-    {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 10,  "target_pts": 0.450, "sl_pts": 0.150},
-    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 40,  "target_pts": 1.00,  "sl_pts": 0.25},
+    {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 0,  "target_pts": 0.150, "sl_pts": 0.150},
+    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 60,  "target_pts": 0.50,  "sl_pts": 0.50},
 ]
 
 CONTRACT_SIZE_MAP = {
