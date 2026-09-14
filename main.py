@@ -1,6 +1,7 @@
 import time
 import threading
 from datetime import datetime
+import os
 import pytz
 import pandas as pd
 import requests
@@ -147,4 +148,5 @@ if __name__ == "__main__":
         t = threading.Thread(target=run_strategy, args=(coin,), daemon=True)
         t.start()
     
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
