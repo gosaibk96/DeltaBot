@@ -10,14 +10,14 @@ import hashlib
 
 # ================= CONFIGURATION =================
 CONFIG = {
-    "XRPUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.5, "trail_pct": 0.5, "rr": 4.0},
-    "DOTUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.5, "trail_pct": 0.5, "rr": 4.0},
-    "GRAMUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.5, "trail_pct": 0.5, "rr": 4.0},
-    "PIEVERSEUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.5, "trail_pct": 0.5, "rr": 4.0},
-    "RIVERUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
-    "MUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
-    "ZROUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
-    "FILUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "XRPUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "DOTUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "GRAMUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "PIEVERSEUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "RIVERUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "MUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "ZROUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "FILUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
 }
 
 API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
@@ -89,17 +89,19 @@ def run_strategy(symbol):
                         live_df = fetch_candles(symbol, conf['timeframe'])
                         if live_df is not None:
                             curr_price = live_df.iloc[-1]['close']
+                            curr_high = live_df.iloc[-1]['high']
+                            curr_low = live_df.iloc[-1]['low']
                             bot_states[symbol]["last_price"] = curr_price
                             
-                            if curr_price > c_high:
+                            if curr_high > c_high:
                                 entry_t = get_ist_time()
                                 bot_states[symbol]["entry_time"] = entry_t
                                 bot_states[symbol]["status"] = "BUY Executed (Trailing Active)"
-                                print(f"🟢 [{symbol}] BUY Triggered at {curr_price} | Time: {entry_t}", flush=True)
+                                print(f"🟢 [{symbol}] BUY Triggered at {curr_high} | Time: {entry_t}", flush=True)
                                 place_order(symbol, "buy", conf['lot'])
                                 
                                 initial_sl = c_low
-                                best_price = curr_price
+                                best_price = curr_high
                                 trail_step = conf['trail_pct'] / 100.0
                                 
                                 while True:
@@ -107,10 +109,11 @@ def run_strategy(symbol):
                                     check_df = fetch_candles(symbol, conf['timeframe'])
                                     if check_df is not None:
                                         p = check_df.iloc[-1]['close']
+                                        phigh = check_df.iloc[-1]['high']
                                         bot_states[symbol]["last_price"] = p
                                         
-                                        if p > best_price:
-                                            best_price = p
+                                        if phigh > best_price:
+                                            best_price = phigh
                                             initial_sl = best_price * (1 - trail_step)
                                             print(f"🔄 [{symbol}] Trailing SL updated to: {initial_sl} (Best Price: {best_price})", flush=True)
                                             
@@ -122,15 +125,15 @@ def run_strategy(symbol):
                                             break
                                 break
                                 
-                            elif curr_price < c_low:
+                            elif curr_low < c_low:
                                 entry_t = get_ist_time()
                                 bot_states[symbol]["entry_time"] = entry_t
                                 bot_states[symbol]["status"] = "SELL Executed (Trailing Active)"
-                                print(f"🔴 [{symbol}] SELL Triggered at {curr_price} | Time: {entry_t}", flush=True)
+                                print(f"🔴 [{symbol}] SELL Triggered at {curr_low} | Time: {entry_t}", flush=True)
                                 place_order(symbol, "sell", conf['lot'])
                                 
                                 initial_sl = c_high
-                                best_price = curr_price
+                                best_price = curr_low
                                 trail_step = conf['trail_pct'] / 100.0
                                 
                                 while True:
@@ -138,10 +141,11 @@ def run_strategy(symbol):
                                     check_df = fetch_candles(symbol, conf['timeframe'])
                                     if check_df is not None:
                                         p = check_df.iloc[-1]['close']
+                                        plow = check_df.iloc[-1]['low']
                                         bot_states[symbol]["last_price"] = p
                                         
-                                        if p < best_price:
-                                            best_price = p
+                                        if plow < best_price:
+                                            best_price = plow
                                             initial_sl = best_price * (1 + trail_step)
                                             print(f"🔄 [{symbol}] Trailing SL updated to: {initial_sl} (Best Price: {best_price})", flush=True)
                                             
