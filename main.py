@@ -81,14 +81,12 @@ def run_strategy(symbol):
                                 bot_states[symbol]["entry_time"] = entry_t
                                 bot_states[symbol]["status"] = "BUY Executed (Trailing Active)"
                                 print(f"🟢 [{symbol}] BUY Triggered at {curr_price} | Time: {entry_t}", flush=True)
-                                # TODO: Place Buy Order & Trailing SL logic here
                                 break
                             elif curr_price < c_low:
                                 entry_t = get_ist_time()
                                 bot_states[symbol]["entry_time"] = entry_t
                                 bot_states[symbol]["status"] = "SELL Executed (Trailing Active)"
                                 print(f"🔴 [{symbol}] SELL Triggered at {curr_price} | Time: {entry_t}", flush=True)
-                                # TODO: Place Sell Order & Trailing SL logic here
                                 break
         except Exception as e:
             print(f"❌ Error in strategy loop for {symbol}: {e}", flush=True)
