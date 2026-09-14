@@ -1,451 +1,150 @@
-from flask import Flask, render_template_string
-import threading
 import time
-import os
-import requests
-import hmac
-import hashlib
-import json
+import threading
+from datetime import datetime
+import pytz
 import pandas as pd
-import numpy as np
+import requests
+from flask import Flask, jsonify, render_template_string
+
+# ================= CONFIGURATION =================
+CONFIG = {
+    "XRPUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "DOTUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "GRAMUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "PIEVERSEUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "RIVERUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "MUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "ZROUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+    "FILUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
+}
+
+API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
+API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
+
+# Global tracking state for Dashboard
+bot_states = {coin: {"status": "Monitoring", "pnl": 0.0, "entry_time": "-", "exit_time": "-", "last_price": 0.0} for coin in CONFIG}
+
+ist = pytz.timezone('Asia/Kolkata')
 
 app = Flask(__name__)
 
-RENDER_APP_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
-DATA_FILE = "trade_history.json"
-
-if os.path.exists(DATA_FILE):
-    try:
-        os.remove(DATA_FILE)
-    except Exception:
-        pass
-
-# =====================================================================
-# ⚙️ USER CONFIGURATION (Target & SL/Trailing Distance in Points)
-# =====================================================================
-API_KEY = '4vtWGaF4x4LWleMfoj1ztriQp7rweE'
-API_SECRET = 'dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW'
-BASE_URL = "https://api.india.delta.exchange"
-
-ST_PERIOD = 10
-ST_MULTIPLIER = 1.5
-
-COINS_TO_TRADE = [
-    {"symbol": "BTCUSD",   "product_id": 27,     "timeframe": "15m",  "lot_size": 0,   "target_pts": 750.0, "sl_pts": 250.0},
-    {"symbol": "XAUTUSD",  "product_id": 131253, "timeframe": "15m",  "lot_size": 300, "target_pts": 10.0,  "sl_pts": 10.0},
-    {"symbol": "ETHUSD",   "product_id": 3136,   "timeframe": "15m",  "lot_size": 20,  "target_pts": 10.0,  "sl_pts": 10.0},
-    {"symbol": "SOLUSD",   "product_id": 14823,  "timeframe": "15m",  "lot_size": 0,   "target_pts": 1.50,  "sl_pts": 0.50},
-    {"symbol": "COINXUSD", "product_id": 125551, "timeframe": "15m",  "lot_size": 0,   "target_pts": 20.0,  "sl_pts": 12.0},
-    {"symbol": "LINKUSD",  "product_id": 15041,  "timeframe": "15m",  "lot_size": 0,  "target_pts": 0.150, "sl_pts": 0.150},
-    {"symbol": "SLVONUSD", "product_id": 124058, "timeframe": "15m",  "lot_size": 60,  "target_pts": 0.50,  "sl_pts": 0.50},
-]
-
-CONTRACT_SIZE_MAP = {
-    "BTCUSD": 0.001,
-    "XAUTUSD": 0.001,
-    "ETHUSD": 0.01,
-    "COINXUSD": 0.01,
-    "SLVONUSD": 0.01,
-    "SOLUSD": 0.1,
-    "LINKUSD": 1.0
-}
-# =====================================================================
-
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        initial_data = {
-            "overall": {"total_trades": 0, "net_pnl": 0.0},
-            "coins": {c["symbol"]: {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0} for c in COINS_TO_TRADE},
-            "history": []
-        }
-        with open(DATA_FILE, "w") as f:
-            json.dump(initial_data, f, indent=4)
-        return initial_data
-    try:
-        with open(DATA_FILE, "r") as f:
-            data = json.load(f)
-            for c in COINS_TO_TRADE:
-                if c["symbol"] not in data["coins"]:
-                    data["coins"][c["symbol"]] = {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0}
-            return data
-    except Exception:
-        return {"overall": {"total_trades": 0, "net_pnl": 0.0}, "coins": {}, "history": []}
-
-def log_trade(symbol, trade_type, entry_time_str, entry_price, exit_price, current_lot_size):
-    try:
-        data = load_data()
-        multiplier = CONTRACT_SIZE_MAP.get(symbol, 1.0)
-        
-        if trade_type == "BUY":
-            price_diff = exit_price - entry_price
-        else:
-            price_diff = entry_price - exit_price
-
-        pnl = price_diff * current_lot_size * multiplier
-
-        if symbol not in data["coins"]:
-            data["coins"][symbol] = {"trades": 0, "wins": 0, "losses": 0, "pnl": 0.0}
-
-        data["coins"][symbol]["trades"] += 1
-        if pnl >= 0:
-            data["coins"][symbol]["wins"] += 1
-        else:
-            data["coins"][symbol]["losses"] += 1
-
-        data["coins"][symbol]["pnl"] = round(data["coins"][symbol]["pnl"] + pnl, 2)
-        data["overall"]["total_trades"] += 1
-        data["overall"]["net_pnl"] = round(data["overall"]["net_pnl"] + pnl, 2)
-
-        data["history"].insert(0, {
-            "entry_time": entry_time_str,
-            "exit_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "symbol": symbol,
-            "type": trade_type,
-            "lots": current_lot_size,
-            "entry": round(entry_price, 2),
-            "exit": round(exit_price, 2),
-            "pnl": round(pnl, 2)
-        })
-
-        data["history"] = data["history"][:50]
-
-        with open(DATA_FILE, "w") as f:
-            json.dump(data, f, indent=4)
-        print(f"📝 [LOGGED] {symbol} {trade_type} Trade Saved. PnL: {round(pnl, 2)}", flush=True)
-    except Exception as e:
-        print(f"❌ [{symbol}] Logging Error: {e}", flush=True)
-
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Supertrend Bot Dashboard</title>
-    <meta http-equiv="refresh" content="10">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-        h1, h2 { text-align: center; color: #38bdf8; }
-        .summary-box { background: #1e293b; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 25px; border: 1px solid #334155; }
-        .summary-title { font-size: 1.1em; color: #94a3b8; }
-        .summary-value { font-size: 2.2em; font-weight: bold; margin-top: 5px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
-        .card { background: #1e293b; border-radius: 12px; padding: 18px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .coin-name { font-size: 1.2em; font-weight: bold; color: #facc15; border-bottom: 1px solid #334155; padding-bottom: 8px; margin-bottom: 10px; }
-        .stat { display: flex; justify-content: space-between; margin: 6px 0; font-size: 0.95em; color: #cbd5e1; }
-        .profit { color: #4ade80; font-weight: bold; }
-        .loss { color: #f87171; font-weight: bold; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: #1e293b; border-radius: 8px; overflow: hidden; }
-        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #334155; font-size: 0.85em; }
-        th { background: #334155; color: #38bdf8; }
-    </style>
-</head>
-<body>
-    <h1>🚀 Supertrend Bot Dashboard</h1>
-    
-    <div class="summary-box">
-        <div class="summary-title">Total Portfolio Net P&L</div>
-        <div class="summary-value {{ 'profit' if data.overall.net_pnl >= 0 else 'loss' }}">
-            {{ "${:,.2f}".format(data.overall.net_pnl) }}
-        </div>
-        <div style="margin-top:6px; color:#94a3b8;">Total Trades Executed: {{ data.overall.total_trades }}</div>
-    </div>
-
-    <h2>📊 Coin-wise Performance Cards</h2>
-    <div class="grid">
-        {% for symbol, stats in data.coins.items() %}
-        <div class="card">
-            <div class="coin-name">{{ symbol }}</div>
-            <div class="stat"><span>Total Trades:</span> <span>{{ stats.trades }}</span></div>
-            <div class="stat"><span>Wins / Losses:</span> <span>{{ stats.wins }} / {{ stats.losses }}</span></div>
-            <div class="stat">
-                <span>Net P&L:</span>
-                <span class="{{ 'profit' if stats.pnl >= 0 else 'loss' }}">
-                    {{ "${:,.2f}".format(stats.pnl) }}
-                </span>
-            </div>
-        </div>
-        {% endfor %}
-    </div>
-
-    <h2 style="margin-top: 30px;">📜 Live Executed Trade Logs</h2>
-    <table>
-        <tr>
-            <th>Entry Time</th>
-            <th>Exit Time</th>
-            <th>Coin</th>
-            <th>Type</th>
-            <th>Lots</th>
-            <th>Entry</th>
-            <th>Exit</th>
-            <th>P&L</th>
-        </tr>
-        {% for trade in data.history %}
-        <tr>
-            <td>{{ trade.entry_time }}</td>
-            <td>{{ trade.exit_time }}</td>
-            <td><b>{{ trade.symbol }}</b></td>
-            <td>{{ trade.type }}</td>
-            <td>{{ trade.lots }}</td>
-            <td>{{ trade.entry }}</td>
-            <td>{{ trade.exit }}</td>
-            <td class="{{ 'profit' if trade.pnl >= 0 else 'loss' }}">{{ "${:,.2f}".format(trade.pnl) }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-</body>
-</html>
-"""
-
-@app.route('/')
-def home():
-    data = load_data()
-    return render_template_string(HTML_TEMPLATE, data=data)
-
-TF_SECONDS_MAP = {
-    "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400
-}
-
-def generate_signature(method, timestamp, path, payload=""):
-    signature_data = method + timestamp + path + payload
-    return hmac.new(
-        API_SECRET.strip().encode('utf-8'),
-        signature_data.encode('utf-8'),
-        hashlib.sha256
-    ).hexdigest()
-
-def keep_awake():
-    while True:
-        time.sleep(120)
-        if RENDER_APP_URL:
-            try:
-                requests.get(RENDER_APP_URL, timeout=5)
-            except Exception:
-                pass
+def get_ist_time():
+    return datetime.now(ist).strftime('%d-%b-%Y %I:%M:%S %p')
 
 def fetch_candles(symbol, timeframe):
     try:
-        end_time = int(time.time())
-        candle_seconds = TF_SECONDS_MAP.get(timeframe, 60)
-        start_time = end_time - (120 * candle_seconds)
-        
-        path = f"/v2/history/candles?symbol={symbol}&resolution={timeframe}&start={start_time}&end={end_time}"
-        res = requests.get(BASE_URL + path, timeout=10)
-        
-        if res.status_code == 200:
-            data = res.json()
-            if data.get('success') and 'result' in data and len(data['result']) > 0:
-                df = pd.DataFrame(data['result'])
-                df = df.iloc[::-1].reset_index(drop=True)
-                df['close'] = df['close'].astype(float)
-                df['high'] = df['high'].astype(float)
-                df['low'] = df['low'].astype(float)
-                df['volume'] = df['volume'].astype(float)
-                return df
-        return None
+        url = f"https://api.delta.exchange/v2/history/candles?resolution={timeframe}&symbol={symbol}"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        if data.get("success") and "result" in data:
+            df = pd.DataFrame(data["result"], columns=["time", "open", "high", "low", "close", "volume"])
+            df = df.astype({"open": float, "high": float, "low": float, "close": float})
+            return df
     except Exception as e:
-        print(f"⚠️ [{symbol}] Candle Fetch Error: {e}", flush=True)
-        return None
+        print(f"❌ Error fetching candles for {symbol}: {e}", flush=True)
+    return None
 
-def calculate_supertrend(df):
-    high_low = df['high'] - df['low']
-    high_close = np.abs(df['high'] - df['close'].shift())
-    low_close = np.abs(df['low'] - df['close'].shift())
-    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-    atr = tr.rolling(ST_PERIOD).mean()
-
-    basic_ub = (df['high'] + df['low']) / 2 + (ST_MULTIPLIER * atr)
-    basic_lb = (df['high'] + df['low']) / 2 - (ST_MULTIPLIER * atr)
-
-    upperband = basic_ub.copy()
-    lowerband = basic_lb.copy()
-
-    for i in range(1, len(df)):
-        if df['close'].iloc[i-1] <= upperband.iloc[i-1]:
-            upperband.iloc[i] = min(basic_ub.iloc[i], upperband.iloc[i-1])
-        else:
-            upperband.iloc[i] = basic_ub.iloc[i]
-
-        if df['close'].iloc[i-1] >= lowerband.iloc[i-1]:
-            lowerband.iloc[i] = max(basic_lb.iloc[i], lowerband.iloc[i-1])
-        else:
-            lowerband.iloc[i] = basic_lb.iloc[i]
-
-    supertrend = pd.Series(index=df.index, dtype=float)
-    direction = pd.Series(index=df.index, dtype=int)
-
-    for i in range(1, len(df)):
-        if df['close'].iloc[i] > upperband.iloc[i-1]:
-            direction.iloc[i] = 1
-        elif df['close'].iloc[i] < lowerband.iloc[i-1]:
-            direction.iloc[i] = -1
-        else:
-            direction.iloc[i] = direction.iloc[i-1]
-
-        supertrend.iloc[i] = lowerband.iloc[i] if direction.iloc[i] == 1 else upperband.iloc[i]
-
-    df['supertrend'] = supertrend
-    df['st_direction'] = direction
-    return df
-
-def place_order(product_id, lot_size, side, reduce_only=False):
-    try:
-        path = "/v2/orders"
-        timestamp = str(int(time.time()))
-        payload_dict = {
-            "product_id": product_id,
-            "size": lot_size,
-            "side": side,
-            "order_type": "market_order"
-        }
-        if reduce_only:
-            payload_dict["reduce_only"] = True
-
-        payload = json.dumps(payload_dict)
-        headers = {
-            'api-key': API_KEY.strip(),
-            'signature': generate_signature("POST", timestamp, path, payload),
-            'timestamp': timestamp,
-            'Content-Type': 'application/json'
-        }
-        res = requests.post(BASE_URL + path, headers=headers, data=payload, timeout=10)
-        res_json = res.json()
-        print(f"📡 [API ORDER RESPONSE] Side: {side.upper()} | Success: {res_json.get('success')} | Res: {res_json}", flush=True)
-        return res_json
-    except Exception as e:
-        print(f"❌ [API ORDER ERROR] {e}", flush=True)
-        return {}
-
-def run_coin_strategy(coin):
-    symbol = coin["symbol"]
-    product_id = coin["product_id"]
-    timeframe = coin["timeframe"]
-    lot_size = coin["lot_size"]
-    target_pts = coin["target_pts"]
-    sl_pts = coin["sl_pts"]
-
-    if lot_size <= 0:
-        return
-
-    current_position = None
-    entry_price = 0.0
-    entry_time_str = ""
-    current_sl = 0.0
-    current_target = 0.0
-    highest_price = 0.0
-    lowest_price = 0.0
-    last_signal_direction = None
-
-    print(f"✅ INITIALIZING: {symbol} | Target Pts: {target_pts} | Fixed SL & Trailing Gap: {sl_pts}", flush=True)
-
+def run_strategy(symbol):
+    conf = CONFIG[symbol]
+    print(f"🚀 Started worker thread for {symbol} | Timeframe: {conf['timeframe']} | Lot: {conf['lot']}", flush=True)
+    
     while True:
         try:
-            df = fetch_candles(symbol, timeframe)
-            if df is not None and len(df) > ST_PERIOD + 2:
-                df = calculate_supertrend(df)
-                
-                live_price = df.iloc[-1]['close']
+            df = fetch_candles(symbol, conf['timeframe'])
+            if df is not None and len(df) > 2:
                 closed_candle = df.iloc[-2]
-                st_val = closed_candle['supertrend']
-                closed_direction = closed_candle['st_direction']
-
-                if last_signal_direction is None:
-                    last_signal_direction = closed_direction
-
-                # Continuous status print
-                print(f"📊 [{symbol}] Price: {live_price} | ST: {round(st_val, 2)} | Pos: {current_position or 'NONE'}", flush=True)
-
-                # ==========================================
-                # EXIT & CONTINUOUS TRAILING SL LOGIC (SL Gap Maintained)
-                # ==========================================
-                if current_position == "BUY":
-                    if live_price > highest_price:
-                        highest_price = live_price
-                        # Trailing SL shifts dynamically maintaining 'sl_pts' distance from peak price
-                        new_tsl = highest_price - sl_pts
-                        if new_tsl > current_sl:
-                            current_sl = new_tsl
-                            print(f"📈 [TRAILING SL - LONG] {symbol}: New SL -> {current_sl} (Gap: {sl_pts})", flush=True)
-
-                    if live_price >= current_target:
-                        print(f"🎯 TARGET HIT [LONG]: {symbol} at {live_price} (Target was {current_target})", flush=True)
-                        res = place_order(product_id, lot_size, "sell", reduce_only=True)
-                        if res.get('success'):
-                            log_trade(symbol, "BUY", entry_time_str, entry_price, live_price, lot_size)
-                            current_position = None
-                    elif live_price <= current_sl:
-                        print(f"🛑 STOP LOSS / TSL HIT [LONG]: {symbol} at {live_price} (SL was {current_sl})", flush=True)
-                        res = place_order(product_id, lot_size, "sell", reduce_only=True)
-                        if res.get('success'):
-                            log_trade(symbol, "BUY", entry_time_str, entry_price, live_price, lot_size)
-                            current_position = None
-
-                elif current_position == "SELL":
-                    if live_price < lowest_price:
-                        lowest_price = live_price
-                        # Trailing SL shifts dynamically maintaining 'sl_pts' distance from lowest price
-                        new_tsl = lowest_price + sl_pts
-                        if new_tsl < current_sl:
-                            current_sl = new_tsl
-                            print(f"📉 [TRAILING SL - SHORT] {symbol}: New SL -> {current_sl} (Gap: {sl_pts})", flush=True)
-
-                    if live_price <= current_target:
-                        print(f"🎯 TARGET HIT [SHORT]: {symbol} at {live_price} (Target was {current_target})", flush=True)
-                        res = place_order(product_id, lot_size, "buy", reduce_only=True)
-                        if res.get('success'):
-                            log_trade(symbol, "SELL", entry_time_str, entry_price, live_price, lot_size)
-                            current_position = None
-                    elif live_price >= current_sl:
-                        print(f"🛑 STOP LOSS / TSL HIT [SHORT]: {symbol} at {live_price} (SL was {current_sl})", flush=True)
-                        res = place_order(product_id, lot_size, "buy", reduce_only=True)
-                        if res.get('success'):
-                            log_trade(symbol, "SELL", entry_time_str, entry_price, live_price, lot_size)
-                            current_position = None
-
-                # ==========================================
-                # ENTRY LOGIC (Crossover / Trend Direction Change)
-                # ==========================================
-                if current_position is None:
-                    if closed_direction == 1 and last_signal_direction != 1:
-                        print(f"🟢 BUY ENTRY SIGNAL: {symbol} Direction Changed to Bullish at {live_price}!", flush=True)
-                        res = place_order(product_id, lot_size, "buy", reduce_only=False)
-                        if res.get('success'):
-                            current_position = "BUY"
-                            entry_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
-                            entry_price = live_price
-                            highest_price = live_price
-                            current_target = entry_price + target_pts
-                            current_sl = entry_price - sl_pts  # Initial SL distance equals sl_pts
-                            last_signal_direction = 1
-                            print(f"✅ BUY POSITION OPENED | Entry: {entry_price} | Target: {current_target} | Initial SL: {current_sl}", flush=True)
-                            time.sleep(5)
-
-                    elif closed_direction == -1 and last_signal_direction != -1:
-                        print(f"🔴 SELL ENTRY SIGNAL: {symbol} Direction Changed to Bearish at {live_price}!", flush=True)
-                        res = place_order(product_id, lot_size, "sell", reduce_only=False)
-                        if res.get('success'):
-                            current_position = "SELL"
-                            entry_time_str = time.strftime("%Y-%m-%d %H:%M:%S")
-                            entry_price = live_price
-                            lowest_price = live_price
-                            current_target = entry_price - target_pts
-                            current_sl = entry_price + sl_pts  # Initial SL distance equals sl_pts
-                            last_signal_direction = -1
-                            print(f"✅ SELL POSITION OPENED | Entry: {entry_price} | Target: {current_target} | Initial SL: {current_sl}", flush=True)
-                            time.sleep(5)
-
-                    if closed_direction != last_signal_direction:
-                        last_signal_direction = closed_direction
-
+                live_price = df.iloc[-1]['close']
+                
+                bot_states[symbol]["last_price"] = live_price
+                
+                c_high = closed_candle['high']
+                c_low = closed_candle['low']
+                c_range = c_high - c_low
+                c_price = closed_candle['close']
+                
+                range_pct = (c_range / c_price) * 100
+                
+                if range_pct <= conf['max_candle_pct']:
+                    bot_states[symbol]["status"] = f"Setup Active (High: {c_high}, Low: {c_low})"
+                    print(f"📊 [{symbol}] Valid Candle Found! Range %: {round(range_pct, 2)}% | High: {c_high} | Low: {c_low}", flush=True)
+                    
+                    while True:
+                        time.sleep(5)
+                        live_df = fetch_candles(symbol, conf['timeframe'])
+                        if live_df is not None:
+                            curr_price = live_df.iloc[-1]['close']
+                            bot_states[symbol]["last_price"] = curr_price
+                            
+                            if curr_price > c_high:
+                                entry_t = get_ist_time()
+                                bot_states[symbol]["entry_time"] = entry_t
+                                bot_states[symbol]["status"] = "BUY Executed (Trailing Active)"
+                                print(f"🟢 [{symbol}] BUY Triggered at {curr_price} | Time: {entry_t}", flush=True)
+                                # TODO: Place Buy Order & Trailing SL logic here
+                                break
+                            elif curr_price < c_low:
+                                entry_t = get_ist_time()
+                                bot_states[symbol]["entry_time"] = entry_t
+                                bot_states[symbol]["status"] = "SELL Executed (Trailing Active)"
+                                print(f"🔴 [{symbol}] SELL Triggered at {curr_price} | Time: {entry_t}", flush=True)
+                                # TODO: Place Sell Order & Trailing SL logic here
+                                break
         except Exception as e:
-            print(f"❌ [{symbol}] Loop Exception: {e}", flush=True)
+            print(f"❌ Error in strategy loop for {symbol}: {e}", flush=True)
+            
+        time.sleep(30)
 
-        time.sleep(10)
+# ================= FLASK DASHBOARD =================
+@app.route("/")
+def dashboard():
+    html = """
+    <html>
+    <head>
+        <title>Volatility Bot Dashboard</title>
+        <meta http-equiv="refresh" content="10">
+        <style>
+            body { font-family: Arial, sans-serif; background: #121212; color: #fff; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #333; padding: 12px; text-align: center; }
+            th { background: #1f1f1f; }
+            tr:nth-child(even) { background: #181818; }
+        </style>
+    </head>
+    <body>
+        <h1>📈 Volatility Breakout Bot Dashboard (IST)</h1>
+        <table>
+            <tr>
+                <th>Coin</th>
+                <th>Last Price</th>
+                <th>Status</th>
+                <th>Entry Time (IST)</th>
+                <th>Exit Time (IST)</th>
+                <th>Live PnL</th>
+            </tr>
+            {% for coin, state in states.items() %}
+            <tr>
+                <td><b>{{ coin }}</b></td>
+                <td>{{ state.last_price }}</td>
+                <td>{{ state.status }}</td>
+                <td>{{ state.entry_time }}</td>
+                <td>{{ state.exit_time }}</td>
+                <td style="color: {% if state.pnl >= 0 %}#4CAF50{% else %}#F44336{% endif %};">{{ state.pnl }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </body>
+    </html>
+    """
+    return render_template_string(html, states=bot_states)
 
-for coin in COINS_TO_TRADE:
-    threading.Thread(target=run_coin_strategy, args=(coin,), daemon=True).start()
+@app.route("/ping")
+def ping():
+    return jsonify({"status": "alive", "time": get_ist_time()}), 200
 
-threading.Thread(target=keep_awake, daemon=True).start()
-
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+# ================= MAIN ENTRY =================
+if __name__ == "__main__":
+    for coin in CONFIG:
+        t = threading.Thread(target=run_strategy, args=(coin,), daemon=True)
+        t.start()
+    
+    app.run(host="0.0.0.0", port=10000)
