@@ -10,10 +10,10 @@ import hashlib
 
 # ================= CONFIGURATION =================
 CONFIG = {
-    "XRPUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.1, "trail_pct": 0.5, "rr": 4.0},
-    "DOTUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.1, "trail_pct": 0.5, "rr": 4.0},
-    "GRAMUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.1, "trail_pct": 0.5, "rr": 4.0},
-    "PIEVERSEUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.1, "trail_pct": 0.5, "rr": 4.0},
+    "XRPUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.5, "trail_pct": 0.5, "rr": 4.0},
+    "DOTUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.5, "trail_pct": 0.5, "rr": 4.0},
+    "GRAMUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.5, "trail_pct": 0.5, "rr": 4.0},
+    "PIEVERSEUSD": {"timeframe": "5m", "lot": 1, "max_candle_pct": 0.5, "trail_pct": 0.5, "rr": 4.0},
     "RIVERUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
     "MUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
     "ZROUSD": {"timeframe": "1h", "lot": 1, "max_candle_pct": 1.0, "trail_pct": 0.5, "rr": 4.0},
