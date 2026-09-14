@@ -28,15 +28,18 @@ RESOLUTION_SECONDS = {
 }
 
 # ============================================================
-# PER-COIN SETTINGS
+# PER-COIN SETTINGS - Each coin has its own fully independent
+# configuration. Edit any coin's values without affecting others.
+# tick_size must match the product's tick size on Delta Exchange
+# (required for rounding SL/TP/trailing prices to valid values).
 # ============================================================
 
 SYMBOLS = {
     "DOTUSD": {
         "product_id": 15304,
-        "quantity": 5,
+        "quantity": 1,
         "tick_size": 0.001,
-        "candle_resolution": "15m",
+        "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
@@ -44,9 +47,9 @@ SYMBOLS = {
     },
     "XRPUSD": {
         "product_id": 14969,
-        "quantity": 5,
+        "quantity": 1,
         "tick_size": 0.0001,
-        "candle_resolution": "15m",
+        "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
@@ -54,9 +57,9 @@ SYMBOLS = {
     },
     "GRAMUSD": {
         "product_id": 141650,
-        "quantity": 5,
+        "quantity": 1,
         "tick_size": 0.001,
-        "candle_resolution": "15m",
+        "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
@@ -64,9 +67,9 @@ SYMBOLS = {
     },
     "PIEVERSEUSD": {
         "product_id": 131978,
-        "quantity": 5,
+        "quantity": 1,
         "tick_size": 0.0001,
-        "candle_resolution": "15m",
+        "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
@@ -74,9 +77,9 @@ SYMBOLS = {
     },
     "RIVERUSD": {
         "product_id": 115664,
-        "quantity": 5,
+        "quantity": 1,
         "tick_size": 0.001,
-        "candle_resolution": "15m",
+        "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
@@ -84,9 +87,9 @@ SYMBOLS = {
     },
     "MUSD": {
         "product_id": 84925,
-        "quantity": 5,
+        "quantity": 1,
         "tick_size": 0.0001,
-        "candle_resolution": "15m",
+        "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
@@ -94,9 +97,9 @@ SYMBOLS = {
     },
     "ZROUSD": {
         "product_id": 26457,
-        "quantity": 5,
+        "quantity": 1,
         "tick_size": 0.0001,
-        "candle_resolution": "15m",
+        "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
@@ -104,15 +107,17 @@ SYMBOLS = {
     },
     "FILUSD": {
         "product_id": 19617,
-        "quantity": 5,
+        "quantity": 1,
         "tick_size": 0.0001,
-        "candle_resolution": "15m",
+        "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
         "trail_step_pct": 0.1,
     },
 }
+
+# ============================================================
 
 # Global Data Store for Dashboard & API Tracking
 trade_history = []
@@ -128,16 +133,20 @@ def get_candle_seconds(resolution):
     return RESOLUTION_SECONDS.get(resolution, 3600)
 
 def round_to_tick(price, tick_size):
+    """Round price to the nearest valid tick size multiple."""
     if tick_size <= 0:
         return price
     rounded = round(price / tick_size) * tick_size
     decimals = max(0, -int(math.floor(math.log10(tick_size))) if tick_size < 1 else 0)
     return round(rounded, decimals + 2)
 
+
+# ==================== SIGNATURE HELPER ====================
 def generate_signature(secret, message):
     message = bytes(message, "utf-8")
     secret = bytes(secret, "utf-8")
     return hmac.new(secret, message, hashlib.sha256).hexdigest()
+
 
 def get_headers(method, path, query_string="", payload=""):
     timestamp = str(int(time.time()))
@@ -151,18 +160,27 @@ def get_headers(method, path, query_string="", payload=""):
         "Content-Type": "application/json",
     }
 
+
+# ==================== CANDLE BOUNDARY HELPERS ====================
 def get_next_candle_close_time(resolution):
     candle_seconds = get_candle_seconds(resolution)
     now = time.time()
     return (int(now) // candle_seconds + 1) * candle_seconds
 
+
+# ==================== MARKET DATA FUNCTIONS ====================
 def fetch_candle_by_start_time(symbol, resolution, expected_start_time):
     candle_seconds = get_candle_seconds(resolution)
     end_ts = int(time.time())
     start_ts = expected_start_time - (candle_seconds * 3)
     path = "/v2/history/candles"
     url = BASE_URL + path
-    params = {"resolution": resolution, "symbol": symbol, "start": start_ts, "end": end_ts}
+    params = {
+        "resolution": resolution,
+        "symbol": symbol,
+        "start": start_ts,
+        "end": end_ts,
+    }
     try:
         resp = requests.get(url, params=params, timeout=(3, 10))
         data = resp.json()
@@ -174,6 +192,7 @@ def fetch_candle_by_start_time(symbol, resolution, expected_start_time):
     except Exception as e:
         print(f"[{get_ist_time()}][{symbol}] Error fetching candles: {e}", flush=True)
         return None
+
 
 def get_mark_price(symbol):
     path = f"/v2/tickers/{symbol}"
@@ -188,6 +207,7 @@ def get_mark_price(symbol):
         print(f"[{get_ist_time()}][{symbol}] Error fetching ticker: {e}", flush=True)
         return None
 
+
 def get_position_size(product_id):
     method = "GET"
     path = "/v2/positions"
@@ -195,7 +215,9 @@ def get_position_size(product_id):
     url = BASE_URL + path
     headers = get_headers(method, path, query_string)
     try:
-        resp = requests.get(url, params={"product_id": product_id}, headers=headers, timeout=(3, 10))
+        resp = requests.get(
+            url, params={"product_id": product_id}, headers=headers, timeout=(3, 10)
+        )
         data = resp.json()
         if data.get("success"):
             result = data.get("result")
@@ -205,6 +227,7 @@ def get_position_size(product_id):
     except Exception as e:
         print(f"[{get_ist_time()}] Error fetching position for product_id {product_id}: {e}", flush=True)
         return 0
+
 
 def get_order_by_id(order_id):
     method = "GET"
@@ -218,11 +241,18 @@ def get_order_by_id(order_id):
         print(f"[{get_ist_time()}] Error fetching order: {e}", flush=True)
         return None
 
+
+# ==================== ORDER FUNCTIONS ====================
 def place_market_order(product_id, side, size):
     method = "POST"
     path = "/v2/orders"
     url = BASE_URL + path
-    payload_dict = {"product_id": product_id, "size": size, "side": side, "order_type": "market_order"}
+    payload_dict = {
+        "product_id": product_id,
+        "size": size,
+        "side": side,
+        "order_type": "market_order",
+    }
     payload = json.dumps(payload_dict)
     headers = get_headers(method, path, "", payload)
     try:
@@ -232,12 +262,15 @@ def place_market_order(product_id, side, size):
         print(f"[{get_ist_time()}] Error placing market order: {e}", flush=True)
         return None
 
+
 def get_average_fill_price(order_response):
     if not order_response or not order_response.get("success"):
         return None, None
+
     order = order_response.get("result", {})
     fill_price = order.get("average_fill_price")
     order_id = order.get("id")
+
     retries = 5
     while fill_price is None and retries > 0 and order_id:
         time.sleep(0.5)
@@ -245,16 +278,28 @@ def get_average_fill_price(order_response):
         if fresh and fresh.get("success"):
             fill_price = fresh.get("result", {}).get("average_fill_price")
         retries -= 1
+
     return (float(fill_price) if fill_price else None), order_id
 
+
 def place_bracket_sl_tp(symbol, product_id, stop_price, take_profit_price):
+    """Places (or re-places/updates) the position-level bracket order.
+    Since position-level brackets cannot be edited via PUT, this same
+    function is reused for both initial placement AND trailing updates -
+    calling it again simply replaces the existing bracket on the position."""
     method = "POST"
     path = "/v2/orders/bracket"
     url = BASE_URL + path
     payload_dict = {
         "product_id": product_id,
-        "stop_loss_order": {"order_type": "market_order", "stop_price": str(stop_price)},
-        "take_profit_order": {"order_type": "market_order", "stop_price": str(take_profit_price)},
+        "stop_loss_order": {
+            "order_type": "market_order",
+            "stop_price": str(stop_price),
+        },
+        "take_profit_order": {
+            "order_type": "market_order",
+            "stop_price": str(take_profit_price),
+        },
         "bracket_stop_trigger_method": STOP_TRIGGER_METHOD,
     }
     payload = json.dumps(payload_dict)
@@ -269,31 +314,19 @@ def place_bracket_sl_tp(symbol, product_id, stop_price, take_profit_price):
         print(f"[{get_ist_time()}][{symbol}] Error placing bracket order: {e}", flush=True)
         return None
 
-def edit_bracket_stop_loss(symbol, order_id, product_id, new_sl_price):
-    method = "PUT"
-    path = "/v2/orders/bracket"
-    url = BASE_URL + path
-    payload_dict = {"id": order_id, "product_id": product_id, "bracket_stop_loss_price": str(new_sl_price)}
-    payload = json.dumps(payload_dict)
-    headers = get_headers(method, path, "", payload)
-    try:
-        resp = requests.put(url, data=payload, headers=headers, timeout=(3, 10))
-        result = resp.json()
-        if not result.get("success"):
-            print(f"[{get_ist_time()}][{symbol}] ERROR: Trailing SL update FAILED -> {result.get('error')}", flush=True)
-        return result
-    except Exception as e:
-        print(f"[{get_ist_time()}][{symbol}] Error editing bracket stop-loss: {e}", flush=True)
-        return None
 
+# ==================== CANDLE EVALUATION ====================
 def evaluate_closed_candle(symbol, resolution, narrow_range_pct, candle_start_time):
     candle = fetch_candle_by_start_time(symbol, resolution, candle_start_time)
     if not candle:
+        bot_states[symbol]["status"] = "Warning: Candle fetch failed"
         return None
+
     high = float(candle["high"])
     low = float(candle["low"])
     if low <= 0:
         return None
+
     range_pct = (high - low) / low * 100
     if range_pct < narrow_range_pct:
         bot_states[symbol]["status"] = f"Setup Active (H:{high}, L:{low})"
@@ -302,6 +335,8 @@ def evaluate_closed_candle(symbol, resolution, narrow_range_pct, candle_start_ti
         bot_states[symbol]["status"] = f"Monitoring (Range: {round(range_pct, 2)}%)"
         return None
 
+
+# ==================== TRADE EXECUTION ====================
 def execute_breakout_trade(symbol, cfg, side, reference_candle):
     product_id = cfg["product_id"]
     quantity = cfg["quantity"]
@@ -344,11 +379,13 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
         "entry_time": get_ist_time()
     }
 
+
 def update_trailing_sl(symbol, cfg, position_state, current_price):
     product_id = cfg["product_id"]
     trigger_pct = cfg["trail_trigger_pct"]
     step_pct = cfg["trail_step_pct"]
     tick_size = cfg["tick_size"]
+
     entry_price = position_state["entry_price"]
     step_amount = entry_price * (step_pct / 100)
     trigger_amount = entry_price * (trigger_pct / 100)
@@ -362,7 +399,7 @@ def update_trailing_sl(symbol, cfg, position_state, current_price):
         if new_level > position_state["trail_level"] and new_level >= 1:
             new_sl = round_to_tick(entry_price + (new_level - 1) * step_amount, tick_size)
             if new_sl > position_state["sl_price"]:
-                resp = edit_bracket_stop_loss(symbol, position_state["order_id"], product_id, new_sl)
+                resp = place_bracket_sl_tp(symbol, product_id, new_sl, position_state["tp_price"])
                 if resp and resp.get("success"):
                     position_state["sl_price"] = new_sl
                     position_state["trail_level"] = new_level
@@ -374,24 +411,31 @@ def update_trailing_sl(symbol, cfg, position_state, current_price):
         if new_level > position_state["trail_level"] and new_level >= 1:
             new_sl = round_to_tick(entry_price - (new_level - 1) * step_amount, tick_size)
             if new_sl < position_state["sl_price"]:
-                resp = edit_bracket_stop_loss(symbol, position_state["order_id"], product_id, new_sl)
+                resp = place_bracket_sl_tp(symbol, product_id, new_sl, position_state["tp_price"])
                 if resp and resp.get("success"):
                     position_state["sl_price"] = new_sl
                     position_state["trail_level"] = new_level
                     bot_states[symbol]["sl"] = new_sl
                     bot_states[symbol]["trail_level"] = new_level
 
+
+# ==================== BACKGROUND WORKER LOOP ====================
 def background_bot_loop():
     print("Starting multi-symbol narrow-range breakout bot worker...", flush=True)
     state = {}
     for symbol, cfg in SYMBOLS.items():
         next_close = get_next_candle_close_time(cfg["candle_resolution"])
-        state[symbol] = {"next_close_time": next_close, "reference_candle": None, "position": None}
+        state[symbol] = {
+            "next_close_time": next_close,
+            "reference_candle": None,
+            "position": None,
+        }
         bot_states[symbol]["status"] = "Waiting for candle close"
 
     while True:
         try:
             now = time.time()
+
             for symbol, cfg in SYMBOLS.items():
                 sym_state = state[symbol]
                 product_id = cfg["product_id"]
@@ -401,7 +445,9 @@ def background_bot_loop():
                 if now >= sym_state["next_close_time"] + 2:
                     if sym_state["position"] is None:
                         closed_start = sym_state["next_close_time"] - candle_seconds
-                        sym_state["reference_candle"] = evaluate_closed_candle(symbol, resolution, cfg["narrow_range_pct"], closed_start)
+                        sym_state["reference_candle"] = evaluate_closed_candle(
+                            symbol, resolution, cfg["narrow_range_pct"], closed_start
+                        )
                     sym_state["next_close_time"] += candle_seconds
 
                 if sym_state["position"] is not None:
@@ -472,6 +518,8 @@ def background_bot_loop():
             print(f"[{get_ist_time()}] Main loop error: {e}", flush=True)
             time.sleep(POLL_INTERVAL)
 
+
+# ==================== FLASK WEB DASHBOARD & APIS ====================
 @app.route("/")
 def dashboard():
     total_trades = sum(st["wins"] + st["losses"] for st in bot_states.values())
@@ -564,10 +612,8 @@ def dashboard():
 def ping():
     return {"status": "alive", "time": get_ist_time()}, 200
 
-# ==================== JSON API ENDPOINTS ====================
 @app.route("/api/status")
 def api_status():
-    """API endpoint to fetch live status and performance of all coins in JSON format."""
     return {
         "success": True,
         "timestamp": get_ist_time(),
@@ -576,12 +622,12 @@ def api_status():
 
 @app.route("/api/trades")
 def api_trades():
-    """API endpoint to fetch execution trade history logs in JSON format."""
     return {
         "success": True,
         "timestamp": get_ist_time(),
         "trade_history": trade_history
     }, 200
+
 
 if __name__ == "__main__":
     threading.Thread(target=background_bot_loop, daemon=True).start()
