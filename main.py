@@ -35,12 +35,13 @@ def generate_signature(method, endpoint, payload=''):
     current_time = str(int(time.time()))
     signature_data = current_time + method + endpoint + payload
     signature = hmac.new(API_SECRET.encode('utf-8'), signature_data.encode('utf-8'), hashlib.sha256).hexdigest()
-    return headers := {
+    headers = {
         'api-key': API_KEY,
         'timestamp': current_time,
         'signature': signature,
         'Content-Type': 'application/json'
     }
+    return headers
 
 def fetch_candles(symbol, timeframe):
     try:
@@ -58,7 +59,6 @@ def place_order(symbol, side, size):
     try:
         endpoint = "/v2/orders"
         payload = {"product_id": symbol, "size": size, "side": side, "order_type": "market"}
-        # Real execution call template using Delta API authenticated headers
         print(f"⚡ Placing {side} order for {symbol} | Lot: {size}", flush=True)
         return True
     except Exception as e:
@@ -98,7 +98,6 @@ def run_strategy(symbol):
                                 print(f"🟢 [{symbol}] BUY Triggered at {curr_price} | Time: {entry_t}", flush=True)
                                 place_order(symbol, "buy", conf['lot'])
                                 
-                                # Trailing SL Loop (0.5% step rule implementation)
                                 initial_sl = c_low
                                 best_price = curr_price
                                 trail_step = conf['trail_pct'] / 100.0
@@ -112,7 +111,6 @@ def run_strategy(symbol):
                                         
                                         if p > best_price:
                                             best_price = p
-                                            # Shift trailing stop loss upwards by 0.5% steps relative to movement
                                             initial_sl = best_price * (1 - trail_step)
                                             print(f"🔄 [{symbol}] Trailing SL updated to: {initial_sl} (Best Price: {best_price})", flush=True)
                                             
