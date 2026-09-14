@@ -13,8 +13,8 @@ import pytz
 # GLOBAL SETTINGS (shared across all coins)
 # ============================================================
 
-API_KEY = "your_api_key"
-API_SECRET = "your_api_secret"
+API_KEY = "4vtWGaF4x4LWleMfoj1ztriQp7rweE"
+API_SECRET = "dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW"
 
 BASE_URL = "https://api.india.delta.exchange"
 
@@ -114,7 +114,7 @@ SYMBOLS = {
     },
 }
 
-# Global Data Store for Dashboard Tracking
+# Global Data Store for Dashboard & API Tracking
 trade_history = []
 bot_states = {sym: {"status": "Initializing", "last_price": 0.0, "entry": "-", "sl": "-", "tp": "-", "trail_level": 0, "wins": 0, "losses": 0, "net_pnl": 0.0} for sym in SYMBOLS}
 
@@ -563,6 +563,25 @@ def dashboard():
 @app.route("/ping")
 def ping():
     return {"status": "alive", "time": get_ist_time()}, 200
+
+# ==================== JSON API ENDPOINTS ====================
+@app.route("/api/status")
+def api_status():
+    """API endpoint to fetch live status and performance of all coins in JSON format."""
+    return {
+        "success": True,
+        "timestamp": get_ist_time(),
+        "bot_states": bot_states
+    }, 200
+
+@app.route("/api/trades")
+def api_trades():
+    """API endpoint to fetch execution trade history logs in JSON format."""
+    return {
+        "success": True,
+        "timestamp": get_ist_time(),
+        "trade_history": trade_history
+    }, 200
 
 if __name__ == "__main__":
     threading.Thread(target=background_bot_loop, daemon=True).start()
