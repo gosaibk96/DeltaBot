@@ -31,18 +31,6 @@ app = __import__('flask').Flask(__name__)
 def get_ist_time():
     return datetime.now(ist).strftime('%d-%b-%Y %I:%M:%S %p')
 
-def generate_signature(method, endpoint, payload=''):
-    current_time = str(int(time.time()))
-    signature_data = current_time + method + endpoint + payload
-    signature = hmac.new(API_SECRET.encode('utf-8'), signature_data.encode('utf-8'), hashlib.sha256).hexdigest()
-    headers = {
-        'api-key': API_KEY,
-        'timestamp': current_time,
-        'signature': signature,
-        'Content-Type': 'application/json'
-    }
-    return headers
-
 def fetch_candles(symbol, timeframe):
     try:
         url = f"{BASE_URL}/v2/history/candles?resolution={timeframe}&symbol={symbol}"
@@ -69,23 +57,30 @@ def run_strategy(symbol):
     conf = CONFIG[symbol]
     print(f"🚀 Started worker thread for {symbol} | Timeframe: {conf['timeframe']} | Lot: {conf['lot']}", flush=True)
     
+    last_checked_candle_time = None
+
     while True:
         try:
             df = fetch_candles(symbol, conf['timeframe'])
             if df is not None and len(df) > 2:
+                # Get the last fully closed candle (iloc[-2])
                 closed_candle = df.iloc[-2]
+                candle_time = closed_candle['time']
+                
                 live_price = df.iloc[-1]['close']
                 bot_states[symbol]["last_price"] = live_price
                 
                 c_high, c_low = closed_candle['high'], closed_candle['low']
                 range_pct = ((c_high - c_low) / closed_candle['close']) * 100
                 
+                # Check if this is a new closed candle and meets the range condition
                 if range_pct <= conf['max_candle_pct']:
                     bot_states[symbol]["status"] = f"Setup Active (H:{c_high}, L:{c_low})"
-                    print(f"📊 [{symbol}] Valid Candle Found! Range %: {round(range_pct, 2)}%", flush=True)
+                    print(f"📊 [{symbol}] Valid Closed Candle Found! Range %: {round(range_pct, 2)}% | H: {c_high} L: {c_low}", flush=True)
                     
+                    # Now instantly monitor live price ticks (every 2 seconds) for breakout
                     while True:
-                        time.sleep(5)
+                        time.sleep(2)
                         live_df = fetch_candles(symbol, conf['timeframe'])
                         if live_df is not None:
                             curr_price = live_df.iloc[-1]['close']
@@ -93,19 +88,21 @@ def run_strategy(symbol):
                             curr_low = live_df.iloc[-1]['low']
                             bot_states[symbol]["last_price"] = curr_price
                             
+                            # Check if current price / high crosses closed candle High -> BUY
                             if curr_high > c_high:
                                 entry_t = get_ist_time()
                                 bot_states[symbol]["entry_time"] = entry_t
                                 bot_states[symbol]["status"] = "BUY Executed (Trailing Active)"
-                                print(f"🟢 [{symbol}] BUY Triggered at {curr_high} | Time: {entry_t}", flush=True)
+                                print(f"🟢 [{symbol}] BUY Triggered at High {curr_high} > {c_high} | Time: {entry_t}", flush=True)
                                 place_order(symbol, "buy", conf['lot'])
                                 
                                 initial_sl = c_low
                                 best_price = curr_high
                                 trail_step = conf['trail_pct'] / 100.0
                                 
+                                # Trailing SL Loop
                                 while True:
-                                    time.sleep(5)
+                                    time.sleep(2)
                                     check_df = fetch_candles(symbol, conf['timeframe'])
                                     if check_df is not None:
                                         p = check_df.iloc[-1]['close']
@@ -125,19 +122,21 @@ def run_strategy(symbol):
                                             break
                                 break
                                 
+                            # Check if current price / low crosses closed candle Low -> SELL
                             elif curr_low < c_low:
                                 entry_t = get_ist_time()
                                 bot_states[symbol]["entry_time"] = entry_t
                                 bot_states[symbol]["status"] = "SELL Executed (Trailing Active)"
-                                print(f"🔴 [{symbol}] SELL Triggered at {curr_low} | Time: {entry_t}", flush=True)
+                                print(f"🔴 [{symbol}] SELL Triggered at Low {curr_low} < {c_low} | Time: {entry_t}", flush=True)
                                 place_order(symbol, "sell", conf['lot'])
                                 
                                 initial_sl = c_high
                                 best_price = curr_low
                                 trail_step = conf['trail_pct'] / 100.0
                                 
+                                # Trailing SL Loop
                                 while True:
-                                    time.sleep(5)
+                                    time.sleep(2)
                                     check_df = fetch_candles(symbol, conf['timeframe'])
                                     if check_df is not None:
                                         p = check_df.iloc[-1]['close']
@@ -156,14 +155,16 @@ def run_strategy(symbol):
                                             print(f"❌ [{symbol}] Trailing SL hit at {p} | Time: {exit_t}", flush=True)
                                             break
                                 break
+                else:
+                    bot_states[symbol]["status"] = f"Monitoring (Last Range: {round(range_pct, 2)}% > 1%)"
         except Exception as e:
             print(f"❌ Error in strategy loop for {symbol}: {e}", flush=True)
-        time.sleep(30)
+        time.sleep(10)
 
 @app.route("/")
 def dashboard():
     return __import__('flask').render_template_string("""
-    <html><head><title>Bot Dashboard</title><meta http-equiv="refresh" content="10">
+    <html><head><title>Bot Dashboard</title><meta http-equiv="refresh" content="5">
     <style>body{background:#121212;color:#fff;font-family:Arial;padding:20px;}table{width:100%;border-collapse:collapse;margin-top:20px;}th,td{border:1px solid #333;padding:12px;text-align:center;}th{background:#1f1f1f;}</style>
     </head><body><h1>📈 Volatility Breakout Bot Dashboard (IST)</h1><table>
     <tr><th>Coin</th><th>Last Price</th><th>Status</th><th>Entry Time (IST)</th><th>Exit Time (IST)</th><th>Live PnL</th></tr>
