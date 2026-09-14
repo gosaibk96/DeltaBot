@@ -15,7 +15,7 @@ API_SECRET = "dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW"
 BASE_URL = "https://api.india.delta.exchange"
 SYMBOL = "DOTUSD"
 PRODUCT_ID = 15304 
-QUANTITY = 1 
+QUANTITY = 10 
 CANDLE_RESOLUTION = "5m" 
 RESOLUTION_SECONDS = {
     "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, 
