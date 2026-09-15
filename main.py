@@ -31,7 +31,12 @@ RESOLUTION_SECONDS = {
 # PER-COIN SETTINGS - Each coin has its own fully independent
 # configuration. Edit any coin's values without affecting others.
 # tick_size must match the product's tick size on Delta Exchange
-# (required for rounding SL/TP/trailing prices to valid values).
+# (required for rounding SL/TP prices to valid values).
+#
+# NOTE: trail_trigger_pct and trail_step_pct are no longer used by
+# the trailing logic (trailing is now handled natively by Delta
+# Exchange via trail_amount set once at entry). Left in place in
+# case you want to revert or repurpose them later.
 # ============================================================
 
 SYMBOLS = {
@@ -57,20 +62,10 @@ SYMBOLS = {
     },
     "GRAMUSD": {
         "product_id": 141650,
-        "quantity": 15,
+        "quantity": 5,
         "tick_size": 0.001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-        "trail_trigger_pct": 0.1,
-        "trail_step_pct": 0.1,
-    },
-    "PIEVERSEUSD": {
-        "product_id": 131978,
-        "quantity": 10,
-        "tick_size": 0.0001,
-        "candle_resolution": "1h",
-        "narrow_range_pct": 1.0,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
         "trail_step_pct": 0.1,
@@ -87,7 +82,7 @@ SYMBOLS = {
     },
     "MUSD": {
         "product_id": 84925,
-        "quantity": 10,
+        "quantity": 5,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
         "narrow_range_pct": 1.0,
@@ -282,11 +277,12 @@ def get_average_fill_price(order_response):
     return (float(fill_price) if fill_price else None), order_id
 
 
-def place_bracket_sl_tp(symbol, product_id, stop_price, take_profit_price):
-    """Places (or re-places/updates) the position-level bracket order.
-    Since position-level brackets cannot be edited via PUT, this same
-    function is reused for both initial placement AND trailing updates -
-    calling it again simply replaces the existing bracket on the position."""
+def place_bracket_sl_tp(symbol, product_id, trail_amount, take_profit_price):
+    """Places the position-level bracket order with a NATIVE trailing stop-loss.
+    trail_amount is the fixed price distance Delta Exchange maintains between
+    the current favourable price and the stop-loss, trailing it tick-by-tick
+    automatically on the exchange side. Called only ONCE at entry - no repeated
+    POST calls needed, since the exchange itself handles the trailing."""
     method = "POST"
     path = "/v2/orders/bracket"
     url = BASE_URL + path
@@ -294,7 +290,7 @@ def place_bracket_sl_tp(symbol, product_id, stop_price, take_profit_price):
         "product_id": product_id,
         "stop_loss_order": {
             "order_type": "market_order",
-            "stop_price": str(stop_price),
+            "trail_amount": str(trail_amount),
         },
         "take_profit_order": {
             "order_type": "market_order",
@@ -320,14 +316,19 @@ def evaluate_closed_candle(symbol, resolution, narrow_range_pct, candle_start_ti
     candle = fetch_candle_by_start_time(symbol, resolution, candle_start_time)
     if not candle:
         bot_states[symbol]["status"] = "Warning: Candle fetch failed"
+        print(f"[{get_ist_time()}][{symbol}] Candle fetch FAILED for start_time={candle_start_time}", flush=True)
         return None
 
     high = float(candle["high"])
     low = float(candle["low"])
     if low <= 0:
+        print(f"[{get_ist_time()}][{symbol}] Invalid low<=0, skipping candle", flush=True)
         return None
 
     range_pct = (high - low) / low * 100
+
+    print(f"[{get_ist_time()}][{symbol}] Closed Candle -> High: {high}, Low: {low}, Range%: {round(range_pct, 4)}, Threshold: {narrow_range_pct}, Qualifies: {range_pct < narrow_range_pct}", flush=True)
+
     if range_pct < narrow_range_pct:
         bot_states[symbol]["status"] = f"Setup Active (H:{high}, L:{low})"
         return {"high": high, "low": low}
@@ -360,13 +361,15 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
         sl_distance = sl_price - entry_price
         tp_price = round_to_tick(entry_price - (rr_ratio * sl_distance), tick_size)
 
+    trail_amount = round_to_tick(sl_distance, tick_size)
+
     bot_states[symbol]["status"] = f"{side.upper()} Executed"
     bot_states[symbol]["entry"] = entry_price
     bot_states[symbol]["sl"] = sl_price
     bot_states[symbol]["tp"] = tp_price
     bot_states[symbol]["trail_level"] = 0
 
-    place_bracket_sl_tp(symbol, product_id, sl_price, tp_price)
+    place_bracket_sl_tp(symbol, product_id, trail_amount, tp_price)
 
     return {
         "symbol": symbol,
@@ -378,45 +381,6 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
         "trail_level": 0,
         "entry_time": get_ist_time()
     }
-
-
-def update_trailing_sl(symbol, cfg, position_state, current_price):
-    product_id = cfg["product_id"]
-    trigger_pct = cfg["trail_trigger_pct"]
-    step_pct = cfg["trail_step_pct"]
-    tick_size = cfg["tick_size"]
-
-    entry_price = position_state["entry_price"]
-    step_amount = entry_price * (step_pct / 100)
-    trigger_amount = entry_price * (trigger_pct / 100)
-
-    if trigger_amount <= 0:
-        return
-
-    if position_state["side"] == "BUY":
-        favorable_move = current_price - entry_price
-        new_level = int(favorable_move // trigger_amount)
-        if new_level > position_state["trail_level"] and new_level >= 1:
-            new_sl = round_to_tick(entry_price + (new_level - 1) * step_amount, tick_size)
-            if new_sl > position_state["sl_price"]:
-                resp = place_bracket_sl_tp(symbol, product_id, new_sl, position_state["tp_price"])
-                if resp and resp.get("success"):
-                    position_state["sl_price"] = new_sl
-                    position_state["trail_level"] = new_level
-                    bot_states[symbol]["sl"] = new_sl
-                    bot_states[symbol]["trail_level"] = new_level
-    else:
-        favorable_move = entry_price - current_price
-        new_level = int(favorable_move // trigger_amount)
-        if new_level > position_state["trail_level"] and new_level >= 1:
-            new_sl = round_to_tick(entry_price - (new_level - 1) * step_amount, tick_size)
-            if new_sl < position_state["sl_price"]:
-                resp = place_bracket_sl_tp(symbol, product_id, new_sl, position_state["tp_price"])
-                if resp and resp.get("success"):
-                    position_state["sl_price"] = new_sl
-                    position_state["trail_level"] = new_level
-                    bot_states[symbol]["sl"] = new_sl
-                    bot_states[symbol]["trail_level"] = new_level
 
 
 # ==================== BACKGROUND WORKER LOOP ====================
@@ -456,7 +420,7 @@ def background_bot_loop():
                         pos = sym_state["position"]
                         exit_time = get_ist_time()
                         price = get_mark_price(symbol) or pos["entry_price"]
-                        
+
                         if pos["side"] == "BUY":
                             pnl = (price - pos["entry_price"]) * cfg["quantity"]
                             is_win = price >= pos["tp_price"] or pnl > 0
@@ -468,7 +432,7 @@ def background_bot_loop():
                             bot_states[symbol]["wins"] += 1
                         else:
                             bot_states[symbol]["losses"] += 1
-                        
+
                         bot_states[symbol]["net_pnl"] += pnl
 
                         trade_history.insert(0, {
@@ -491,7 +455,6 @@ def background_bot_loop():
                         price = get_mark_price(symbol)
                         if price is not None:
                             bot_states[symbol]["last_price"] = price
-                            update_trailing_sl(symbol, cfg, sym_state["position"], price)
 
                 elif sym_state["reference_candle"] is not None:
                     price = get_mark_price(symbol)
