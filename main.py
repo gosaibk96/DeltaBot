@@ -37,7 +37,7 @@ RESOLUTION_SECONDS = {
 SYMBOLS = {
     "DOTUSD": {
         "product_id": 15304,
-        "quantity": 1,
+        "quantity": 200,
         "tick_size": 0.001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
@@ -47,7 +47,7 @@ SYMBOLS = {
     },
     "XRPUSD": {
         "product_id": 14969,
-        "quantity": 1,
+        "quantity": 150,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
@@ -57,7 +57,7 @@ SYMBOLS = {
     },
     "GRAMUSD": {
         "product_id": 141650,
-        "quantity": 1,
+        "quantity": 15,
         "tick_size": 0.001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
@@ -67,7 +67,7 @@ SYMBOLS = {
     },
     "PIEVERSEUSD": {
         "product_id": 131978,
-        "quantity": 1,
+        "quantity": 20,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
@@ -77,7 +77,7 @@ SYMBOLS = {
     },
     "RIVERUSD": {
         "product_id": 115664,
-        "quantity": 1,
+        "quantity": 150,
         "tick_size": 0.001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
@@ -87,7 +87,7 @@ SYMBOLS = {
     },
     "MUSD": {
         "product_id": 84925,
-        "quantity": 1,
+        "quantity": 20,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
@@ -97,7 +97,7 @@ SYMBOLS = {
     },
     "ZROUSD": {
         "product_id": 26457,
-        "quantity": 1,
+        "quantity": 200,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
@@ -107,7 +107,7 @@ SYMBOLS = {
     },
     "FILUSD": {
         "product_id": 19617,
-        "quantity": 1,
+        "quantity": 200,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
