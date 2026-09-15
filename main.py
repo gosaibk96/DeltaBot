@@ -6,6 +6,7 @@ import requests
 import math
 import os
 import threading
+from decimal import Decimal
 from datetime import datetime
 import pytz
 
@@ -32,11 +33,6 @@ RESOLUTION_SECONDS = {
 # configuration. Edit any coin's values without affecting others.
 # tick_size must match the product's tick size on Delta Exchange
 # (required for rounding SL/TP prices to valid values).
-#
-# NOTE: trail_trigger_pct and trail_step_pct are no longer used by
-# the trailing logic (trailing is now handled natively by Delta
-# Exchange via trail_amount set once at entry). Left in place in
-# case you want to revert or repurpose them later.
 # ============================================================
 
 SYMBOLS = {
@@ -47,8 +43,6 @@ SYMBOLS = {
         "candle_resolution": "1h",
         "narrow_range_pct": 1.0,
         "rr_ratio": 4,
-        "trail_trigger_pct": 0.1,
-        "trail_step_pct": 0.1,
     },
     "XRPUSD": {
         "product_id": 14969,
@@ -57,8 +51,6 @@ SYMBOLS = {
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
-        "trail_trigger_pct": 0.1,
-        "trail_step_pct": 0.1,
     },
     "GRAMUSD": {
         "product_id": 141650,
@@ -67,8 +59,14 @@ SYMBOLS = {
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
-        "trail_trigger_pct": 0.1,
-        "trail_step_pct": 0.1,
+    },
+    "PIEVERSEUSD": {
+        "product_id": 131978,
+        "quantity": 10,
+        "tick_size": 0.0001,
+        "candle_resolution": "1h",
+        "narrow_range_pct": 1.0,
+        "rr_ratio": 4,
     },
     "RIVERUSD": {
         "product_id": 115664,
@@ -77,8 +75,6 @@ SYMBOLS = {
         "candle_resolution": "1h",
         "narrow_range_pct": 1.0,
         "rr_ratio": 4,
-        "trail_trigger_pct": 0.1,
-        "trail_step_pct": 0.1,
     },
     "MUSD": {
         "product_id": 84925,
@@ -87,8 +83,6 @@ SYMBOLS = {
         "candle_resolution": "1h",
         "narrow_range_pct": 1.0,
         "rr_ratio": 4,
-        "trail_trigger_pct": 0.1,
-        "trail_step_pct": 0.1,
     },
     "ZROUSD": {
         "product_id": 26457,
@@ -97,8 +91,6 @@ SYMBOLS = {
         "candle_resolution": "1h",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
-        "trail_trigger_pct": 0.1,
-        "trail_step_pct": 0.1,
     },
     "FILUSD": {
         "product_id": 19617,
@@ -107,8 +99,6 @@ SYMBOLS = {
         "candle_resolution": "1h",
         "narrow_range_pct": 1.0,
         "rr_ratio": 4,
-        "trail_trigger_pct": 0.1,
-        "trail_step_pct": 0.1,
     },
 }
 
@@ -134,6 +124,15 @@ def round_to_tick(price, tick_size):
     rounded = round(price / tick_size) * tick_size
     decimals = max(0, -int(math.floor(math.log10(tick_size))) if tick_size < 1 else 0)
     return round(rounded, decimals + 2)
+
+
+def format_price(value, tick_size):
+    """Formats a price/amount as a plain decimal string (never scientific
+    notation like '5e-05'), with decimal places matching the tick size."""
+    d = Decimal(str(tick_size))
+    exponent = d.as_tuple().exponent
+    decimals = -exponent if exponent < 0 else 0
+    return f"{float(value):.{decimals}f}"
 
 
 # ==================== SIGNATURE HELPER ====================
@@ -277,24 +276,23 @@ def get_average_fill_price(order_response):
     return (float(fill_price) if fill_price else None), order_id
 
 
-def place_bracket_sl_tp(symbol, product_id, trail_amount, take_profit_price):
-    """Places the position-level bracket order with a NATIVE trailing stop-loss.
-    trail_amount is the fixed price distance Delta Exchange maintains between
-    the current favourable price and the stop-loss, trailing it tick-by-tick
-    automatically on the exchange side. Called only ONCE at entry - no repeated
-    POST calls needed, since the exchange itself handles the trailing."""
+def place_bracket_sl_tp(symbol, product_id, trail_amount, take_profit_price, tick_size):
     method = "POST"
     path = "/v2/orders/bracket"
     url = BASE_URL + path
+    
+    formatted_trail = format_price(trail_amount, tick_size)
+    formatted_tp = format_price(take_profit_price, tick_size)
+
     payload_dict = {
         "product_id": product_id,
         "stop_loss_order": {
             "order_type": "market_order",
-            "trail_amount": str(trail_amount),
+            "trail_amount": formatted_trail,
         },
         "take_profit_order": {
             "order_type": "market_order",
-            "stop_price": str(take_profit_price),
+            "stop_price": formatted_tp,
         },
         "bracket_stop_trigger_method": STOP_TRIGGER_METHOD,
     }
@@ -326,7 +324,6 @@ def evaluate_closed_candle(symbol, resolution, narrow_range_pct, candle_start_ti
         return None
 
     range_pct = (high - low) / low * 100
-
     print(f"[{get_ist_time()}][{symbol}] Closed Candle -> High: {high}, Low: {low}, Range%: {round(range_pct, 4)}, Threshold: {narrow_range_pct}, Qualifies: {range_pct < narrow_range_pct}", flush=True)
 
     if range_pct < narrow_range_pct:
@@ -369,7 +366,7 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
     bot_states[symbol]["tp"] = tp_price
     bot_states[symbol]["trail_level"] = 0
 
-    place_bracket_sl_tp(symbol, product_id, trail_amount, tp_price)
+    place_bracket_sl_tp(symbol, product_id, trail_amount, tp_price, tick_size)
 
     return {
         "symbol": symbol,
