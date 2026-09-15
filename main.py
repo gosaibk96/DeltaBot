@@ -60,14 +60,6 @@ SYMBOLS = {
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
     },
-    "PIEVERSEUSD": {
-        "product_id": 131978,
-        "quantity": 10,
-        "tick_size": 0.0001,
-        "candle_resolution": "1h",
-        "narrow_range_pct": 1.0,
-        "rr_ratio": 4,
-    },
     "RIVERUSD": {
         "product_id": 115664,
         "quantity": 100,
