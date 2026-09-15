@@ -37,10 +37,10 @@ RESOLUTION_SECONDS = {
 SYMBOLS = {
     "DOTUSD": {
         "product_id": 15304,
-        "quantity": 200,
+        "quantity": 100,
         "tick_size": 0.001,
         "candle_resolution": "1h",
-        "narrow_range_pct": 0.5,
+        "narrow_range_pct": 1.0,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
         "trail_step_pct": 0.1,
