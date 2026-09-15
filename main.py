@@ -87,10 +87,10 @@ SYMBOLS = {
     },
     "MUSD": {
         "product_id": 84925,
-        "quantity": 20,
+        "quantity": 10,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
-        "narrow_range_pct": 0.5,
+        "narrow_range_pct": 1.0,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
         "trail_step_pct": 0.1,
