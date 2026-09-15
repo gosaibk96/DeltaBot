@@ -22,7 +22,7 @@ BASE_URL = "https://api.india.delta.exchange"
 POLL_INTERVAL = 2
 STOP_TRIGGER_METHOD = "mark_price"
 TRAIL_STEP_PCT = 0.25
-CANDLE_FETCH_RETRY_WINDOW = 20   # seconds to keep retrying candle fetch after close
+CANDLE_FETCH_RETRY_WINDOW = 20
 
 RESOLUTION_SECONDS = {
     "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800,
@@ -32,20 +32,24 @@ RESOLUTION_SECONDS = {
 
 # ============================================================
 # PER-COIN SETTINGS
+# NOTE: "10m" is NOT a supported resolution on Delta Exchange.
+# Supported values are: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 1d, 1w
+# If you need ~10 minutes, use "15m" instead. Set quantity to 0
+# for any coin you want to disable.
 # ============================================================
 
 SYMBOLS = {
-    "XRPUSD": {"product_id": 14969, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "SUIUSD": {"product_id": 17328, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "EVAAUSD": {"product_id": 98745, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "COAIUSD": {"product_id": 98572, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "ASTERUSD": {"product_id": 96160, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "MUSD": {"product_id": 84925, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "ZROUSD": {"product_id": 26457, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "RUNEUSD": {"product_id": 21522, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "APTUSD": {"product_id": 20196, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "FILUSD": {"product_id": 19617, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "LDOUSD": {"product_id": 19616, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "XRPUSD": {"product_id": 14969, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "SUIUSD": {"product_id": 17328, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "EVAAUSD": {"product_id": 98745, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "COAIUSD": {"product_id": 98572, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "ASTERUSD": {"product_id": 96160, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "MUSD": {"product_id": 84925, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "ZROUSD": {"product_id": 26457, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "RUNEUSD": {"product_id": 21522, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "APTUSD": {"product_id": 20196, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "FILUSD": {"product_id": 19617, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "LDOUSD": {"product_id": 19616, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
 }
 
 # ============================================================
@@ -170,7 +174,7 @@ def get_order_by_id(order_id):
         return None
 
 # ==================== ORDER FUNCTIONS ====================
-def place_market_order(product_id, side, size):
+def place_market_order_with_bracket(product_id, side, size, bracket_sl_price, bracket_tp_price):
     method = "POST"
     path = "/v2/orders"
     url = BASE_URL + path
@@ -179,6 +183,9 @@ def place_market_order(product_id, side, size):
         "size": size,
         "side": side,
         "order_type": "market_order",
+        "bracket_stop_loss_price": str(bracket_sl_price),
+        "bracket_take_profit_price": str(bracket_tp_price),
+        "bracket_stop_trigger_method": STOP_TRIGGER_METHOD,
     }
     payload = json.dumps(payload_dict)
     headers = get_headers(method, path, "", payload)
@@ -186,7 +193,7 @@ def place_market_order(product_id, side, size):
         resp = requests.post(url, data=payload, headers=headers, timeout=(3, 10))
         return resp.json()
     except Exception as e:
-        print(f"[{get_ist_time()}] Error placing market order: {e}", flush=True)
+        print(f"[{get_ist_time()}] Error placing market order with bracket: {e}", flush=True)
         return None
 
 def get_average_fill_price(order_response):
@@ -210,55 +217,31 @@ def get_average_fill_price(order_response):
 def emergency_close_position(symbol, product_id, side, quantity):
     close_side = "sell" if side == "buy" else "buy"
     print(f"[{get_ist_time()}][{symbol}] EMERGENCY CLOSE triggered -> closing naked position via market {close_side} order", flush=True)
-    resp = place_market_order(product_id, close_side, quantity)
+    resp = place_market_order_with_bracket(product_id, close_side, quantity, "0", "0")
     if not resp or not resp.get("success"):
         print(f"[{get_ist_time()}][{symbol}] CRITICAL: Emergency close FAILED -> {resp}. Manual intervention required!", flush=True)
     return resp
 
-def place_bracket_sl_tp(symbol, product_id, sl_price, take_profit_price):
-    method = "POST"
-    path = "/v2/orders/bracket"
-    url = BASE_URL + path
-    payload_dict = {
-        "product_id": product_id,
-        "stop_loss_order": {
-            "order_type": "market_order",
-            "stop_price": str(sl_price),
-        },
-        "take_profit_order": {
-            "order_type": "market_order",
-            "stop_price": str(take_profit_price),
-        },
-        "bracket_stop_trigger_method": STOP_TRIGGER_METHOD,
-    }
-    payload = json.dumps(payload_dict)
-    headers = get_headers(method, path, "", payload)
-    try:
-        resp = requests.post(url, data=payload, headers=headers, timeout=(3, 10))
-        result = resp.json()
-        if not result.get("success"):
-            print(f"[{get_ist_time()}][{symbol}] ERROR: Bracket SL/TP placement FAILED -> {result.get('error')}", flush=True)
-        return result
-    except Exception as e:
-        print(f"[{get_ist_time()}][{symbol}] Error placing bracket order: {e}", flush=True)
-        return None
-
-def edit_bracket_stop_loss(symbol, product_id, order_id, new_sl_price):
+def edit_bracket_order(symbol, product_id, order_id, sl_price=None, tp_price=None):
     method = "PUT"
     path = "/v2/orders/bracket"
     url = BASE_URL + path
     payload_dict = {
         "id": order_id,
         "product_id": product_id,
-        "bracket_stop_loss_price": str(new_sl_price),
     }
+    if sl_price is not None:
+        payload_dict["bracket_stop_loss_price"] = str(sl_price)
+    if tp_price is not None:
+        payload_dict["bracket_take_profit_price"] = str(tp_price)
+
     payload = json.dumps(payload_dict)
     headers = get_headers(method, path, "", payload)
     try:
         resp = requests.put(url, data=payload, headers=headers, timeout=(3, 10))
         return resp.json()
     except Exception as e:
-        print(f"[{get_ist_time()}][{symbol}] Error editing bracket SL: {e}", flush=True)
+        print(f"[{get_ist_time()}][{symbol}] Error editing bracket order: {e}", flush=True)
         return None
 
 def check_and_trail_sl(symbol, cfg, pos, live_price):
@@ -286,7 +269,7 @@ def check_and_trail_sl(symbol, cfg, pos, live_price):
     new_sl = round_to_tick(new_sl, tick_size)
     new_sl_str = format_price(new_sl, tick_size)
 
-    result = edit_bracket_stop_loss(symbol, cfg["product_id"], pos["order_id"], new_sl_str)
+    result = edit_bracket_order(symbol, cfg["product_id"], pos["order_id"], sl_price=new_sl_str)
     if result and result.get("success"):
         pos["trail_steps"] = steps_reached
         pos["current_sl"] = new_sl
@@ -315,70 +298,54 @@ def evaluate_candle_data(symbol, candle, narrow_range_pct):
         return None
 
 # ==================== TRADE EXECUTION ====================
-def execute_breakout_trade(symbol, cfg, side, reference_candle):
+def execute_breakout_trade(symbol, cfg, side, reference_candle, estimated_entry_price):
     product_id = cfg["product_id"]
     quantity = cfg["quantity"]
     rr_ratio = cfg["rr_ratio"]
     tick_size = cfg["tick_size"]
 
-    order_resp = place_market_order(product_id, side, quantity)
+    if side == "buy":
+        initial_sl = round_to_tick(reference_candle["low"], tick_size)
+        est_sl_distance = estimated_entry_price - initial_sl
+        est_tp = round_to_tick(estimated_entry_price + (rr_ratio * est_sl_distance), tick_size)
+    else:
+        initial_sl = round_to_tick(reference_candle["high"], tick_size)
+        est_sl_distance = initial_sl - estimated_entry_price
+        est_tp = round_to_tick(estimated_entry_price - (rr_ratio * est_sl_distance), tick_size)
+
+    initial_sl_str = format_price(initial_sl, tick_size)
+    est_tp_str = format_price(est_tp, tick_size)
+
+    order_resp = place_market_order_with_bracket(product_id, side, quantity, initial_sl_str, est_tp_str)
     if not order_resp or not order_resp.get("success"):
-        print(f"[{get_ist_time()}][{symbol}] Market order FAILED -> {order_resp}", flush=True)
+        print(f"[{get_ist_time()}][{symbol}] Market order with bracket FAILED -> {order_resp}", flush=True)
         return None
 
     entry_price, order_id = get_average_fill_price(order_resp)
     if entry_price is None:
-        print(f"[{get_ist_time()}][{symbol}] CRITICAL: Could not fetch average fill price after retries.", flush=True)
-        size = get_position_size(product_id)
-        if size != 0:
-            emergency_close_position(symbol, product_id, side, quantity)
-            return {"cooldown": True}
-        return None
-
-    position_confirmed = False
-    for _ in range(5):
-        size = get_position_size(product_id)
-        if size != 0:
-            position_confirmed = True
-            break
-        time.sleep(0.5)
-
-    if not position_confirmed:
-        print(f"[{get_ist_time()}][{symbol}] CRITICAL: Position not confirmed on exchange after entry. Skipping bracket setup.", flush=True)
-        return None
-
-    if side == "buy":
-        initial_sl = round_to_tick(reference_candle["low"], tick_size)
-        sl_distance = entry_price - initial_sl
-        tp_price = round_to_tick(entry_price + (rr_ratio * sl_distance), tick_size)
+        print(f"[{get_ist_time()}][{symbol}] WARNING: Could not fetch exact fill price after retries. Using estimated entry ({estimated_entry_price}) for tracking.", flush=True)
+        entry_price = estimated_entry_price
     else:
-        initial_sl = round_to_tick(reference_candle["high"], tick_size)
-        sl_distance = initial_sl - entry_price
-        tp_price = round_to_tick(entry_price - (rr_ratio * sl_distance), tick_size)
+        if side == "buy":
+            exact_sl_distance = entry_price - initial_sl
+            exact_tp = round_to_tick(entry_price + (rr_ratio * exact_sl_distance), tick_size)
+        else:
+            exact_sl_distance = initial_sl - entry_price
+            exact_tp = round_to_tick(entry_price - (rr_ratio * exact_sl_distance), tick_size)
 
-    initial_sl_str = format_price(initial_sl, tick_size)
-    tp_price_str = format_price(tp_price, tick_size)
+        exact_tp_str = format_price(exact_tp, tick_size)
+        if exact_tp_str != est_tp_str:
+            correction = edit_bracket_order(symbol, product_id, order_id, tp_price=exact_tp_str)
+            if correction and correction.get("success"):
+                print(f"[{get_ist_time()}][{symbol}] TP corrected for slippage -> {exact_tp_str}", flush=True)
+                est_tp = exact_tp
 
-    print(f"[{get_ist_time()}][{symbol}] ENTRY {side.upper()} @ {entry_price} | Initial SL(candle)={initial_sl_str} | TP={tp_price_str}", flush=True)
-
-    bracket_success = False
-    for attempt in range(1, 4):
-        bracket_resp = place_bracket_sl_tp(symbol, product_id, initial_sl_str, tp_price_str)
-        if bracket_resp and bracket_resp.get("success"):
-            bracket_success = True
-            break
-        print(f"[{get_ist_time()}][{symbol}] Bracket placement attempt {attempt}/3 failed. Retrying...", flush=True)
-        time.sleep(1)
-
-    if not bracket_success:
-        print(f"[{get_ist_time()}][{symbol}] CRITICAL: Bracket SL/TP could not be placed after 3 attempts. Closing naked position for safety. Symbol will PAUSE for cooldown.", flush=True)
-        emergency_close_position(symbol, product_id, side, quantity)
-        return {"cooldown": True}
+    print(f"[{get_ist_time()}][{symbol}] ENTRY {side.upper()} @ {entry_price} | SL(candle)={initial_sl_str} | TP={format_price(est_tp, tick_size)}", flush=True)
 
     bot_states[symbol]["status"] = f"{side.upper()} Executed"
     bot_states[symbol]["entry"] = entry_price
     bot_states[symbol]["sl"] = initial_sl
-    bot_states[symbol]["tp"] = tp_price
+    bot_states[symbol]["tp"] = est_tp
     bot_states[symbol]["trail_level"] = 0
 
     return {
@@ -387,7 +354,7 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
         "entry_price": entry_price,
         "initial_sl": initial_sl,
         "current_sl": initial_sl,
-        "tp_price": tp_price,
+        "tp_price": est_tp,
         "order_id": order_id,
         "trail_steps": 0,
         "entry_time": get_ist_time()
@@ -414,31 +381,29 @@ def background_bot_loop():
             now = time.time()
 
             for symbol, cfg in SYMBOLS.items():
+                if cfg["quantity"] <= 0:
+                    continue
+
                 sym_state = state[symbol]
                 product_id = cfg["product_id"]
                 resolution = cfg["candle_resolution"]
                 candle_seconds = get_candle_seconds(resolution)
                 live_price = None
 
-                # ---- COOLDOWN CHECK ----
                 if now < sym_state["cooldown_until"] and sym_state["position"] is None:
                     price = get_mark_price(symbol)
                     if price is not None:
                         bot_states[symbol]["last_price"] = price
                         live_price = price
                     remaining = int(sym_state["cooldown_until"] - now)
-                    bot_states[symbol]["status"] = f"Paused (bracket failure) - cooling down ({remaining}s left)"
-                    print(f"[{get_ist_time()}][{symbol}] COOLDOWN active -> {remaining}s remaining | LivePrice: {live_price}", flush=True)
+                    bot_states[symbol]["status"] = f"Paused - cooling down ({remaining}s left)"
                     continue
-                # -------------------------
 
-                # ---- TRIGGER a new candle evaluation window when candle closes ----
                 if now >= sym_state["next_close_time"] and sym_state["pending_candle_start"] is None and sym_state["position"] is None:
                     sym_state["pending_candle_start"] = sym_state["next_close_time"] - candle_seconds
                     sym_state["pending_deadline"] = now + CANDLE_FETCH_RETRY_WINDOW
                     sym_state["next_close_time"] += candle_seconds
 
-                # ---- RETRY candle fetch until success or deadline ----
                 if sym_state["pending_candle_start"] is not None:
                     candle = fetch_candle_by_start_time(symbol, resolution, sym_state["pending_candle_start"])
                     if candle:
@@ -446,8 +411,6 @@ def background_bot_loop():
                         sym_state["pending_candle_start"] = None
                         sym_state["pending_deadline"] = None
                     elif now > sym_state["pending_deadline"]:
-                        print(f"[{get_ist_time()}][{symbol}] Candle fetch FAILED after {CANDLE_FETCH_RETRY_WINDOW}s of retries for start_time={sym_state['pending_candle_start']}. Skipping this candle.", flush=True)
-                        bot_states[symbol]["status"] = "Warning: Candle fetch failed"
                         sym_state["pending_candle_start"] = None
                         sym_state["pending_deadline"] = None
 
@@ -488,8 +451,6 @@ def background_bot_loop():
                             "pnl": round(pnl, 2)
                         })
 
-                        print(f"[{get_ist_time()}][{symbol}] Position CLOSED. Entry={pos['entry_price']}, Exit={exit_price}, PnL={round(pnl,2)}", flush=True)
-
                         sym_state["position"] = None
                         bot_states[symbol]["status"] = "Flat / Monitoring"
                         bot_states[symbol]["entry"] = "-"
@@ -504,17 +465,13 @@ def background_bot_loop():
                         live_price = price
                         ref = sym_state["reference_candle"]
                         if price > ref["high"]:
-                            result = execute_breakout_trade(symbol, cfg, "buy", ref)
-                            if result and result.get("cooldown"):
-                                sym_state["cooldown_until"] = time.time() + (candle_seconds * 3)
-                            elif result:
+                            result = execute_breakout_trade(symbol, cfg, "buy", ref, price)
+                            if result:
                                 sym_state["position"] = result
                             sym_state["reference_candle"] = None
                         elif price < ref["low"]:
-                            result = execute_breakout_trade(symbol, cfg, "sell", ref)
-                            if result and result.get("cooldown"):
-                                sym_state["cooldown_until"] = time.time() + (candle_seconds * 3)
-                            elif result:
+                            result = execute_breakout_trade(symbol, cfg, "sell", ref, price)
+                            if result:
                                 sym_state["position"] = result
                             sym_state["reference_candle"] = None
                 else:
@@ -522,12 +479,6 @@ def background_bot_loop():
                     if price is not None:
                         bot_states[symbol]["last_price"] = price
                         live_price = price
-
-                ref = sym_state["reference_candle"]
-                ref_str = f"H:{ref['high']} L:{ref['low']}" if ref else "None"
-                pos_str = sym_state["position"]["side"] if sym_state["position"] else "NONE"
-                pending_str = " [FETCHING CANDLE...]" if sym_state["pending_candle_start"] is not None else ""
-                print(f"[{get_ist_time()}][{symbol}] RefCandle -> {ref_str}{pending_str} | LivePrice: {live_price} | Position: {pos_str}", flush=True)
 
             time.sleep(POLL_INTERVAL)
         except Exception as e:
