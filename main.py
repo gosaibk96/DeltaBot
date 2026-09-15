@@ -14,8 +14,8 @@ import pytz
 # GLOBAL SETTINGS
 # ============================================================
 
-API_KEY = "4vtWGaF4x4LWleMfoj1ztriQp7rweE"
-API_SECRET = "dsuv5MuOGueu7OKXBo0U6CFCHryeEgujn3l7YD5rb5ibsWKDMRVU0BrQDhmW"
+API_KEY = os.environ.get("API_KEY", "your_api_key_here")
+API_SECRET = os.environ.get("API_SECRET", "your_api_secret_here")
 
 BASE_URL = "https://api.india.delta.exchange"
 
@@ -32,24 +32,13 @@ RESOLUTION_SECONDS = {
 
 # ============================================================
 # PER-COIN SETTINGS
-# NOTE: "10m" is NOT a supported resolution on Delta Exchange.
-# Supported values are: 1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 6h, 1d, 1w
-# If you need ~10 minutes, use "15m" instead. Set quantity to 0
-# for any coin you want to disable.
+# Only XRPUSD is active (quantity=1). All other coins are
+# disabled (quantity=0) as requested.
 # ============================================================
 
 SYMBOLS = {
-    "XRPUSD": {"product_id": 14969, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "SUIUSD": {"product_id": 17328, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "EVAAUSD": {"product_id": 98745, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "COAIUSD": {"product_id": 98572, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "ASTERUSD": {"product_id": 96160, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "MUSD": {"product_id": 84925, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "ZROUSD": {"product_id": 26457, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "RUNEUSD": {"product_id": 21522, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "APTUSD": {"product_id": 20196, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "FILUSD": {"product_id": 19617, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "LDOUSD": {"product_id": 19616, "quantity": 2, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "XRPUSD": {"product_id": 14969, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "SUIUSD": {"product_id": 17328, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
 }
 
 # ============================================================
@@ -174,7 +163,54 @@ def get_order_by_id(order_id):
         return None
 
 # ==================== ORDER FUNCTIONS ====================
+def place_stop_entry_order(symbol, product_id, side, size, stop_price_str, bracket_sl_price_str):
+    """Places a pending stop entry order that the exchange itself triggers
+    exactly when price crosses stop_price - no bot-side polling delay.
+    NOTE: stop_order_type='stop_loss_order' is used purely for its trigger
+    DIRECTION (buy triggers on price rising to stop_price, sell triggers on
+    price falling to stop_price) which matches breakout entry mechanics.
+    Delta's docs describe this field in a position-exit context, so this
+    usage for a FRESH entry (no existing position) should be verified on
+    testnet before relying on it with real funds."""
+    method = "POST"
+    path = "/v2/orders"
+    url = BASE_URL + path
+    payload_dict = {
+        "product_id": product_id,
+        "size": size,
+        "side": side,
+        "order_type": "market_order",
+        "stop_order_type": "stop_loss_order",
+        "stop_price": str(stop_price_str),
+        "stop_trigger_method": STOP_TRIGGER_METHOD,
+        "bracket_stop_loss_price": str(bracket_sl_price_str),
+        "bracket_stop_trigger_method": STOP_TRIGGER_METHOD,
+    }
+    payload = json.dumps(payload_dict)
+    headers = get_headers(method, path, "", payload)
+    try:
+        resp = requests.post(url, data=payload, headers=headers, timeout=(3, 10))
+        return resp.json()
+    except Exception as e:
+        print(f"[{get_ist_time()}][{symbol}] Error placing stop entry order: {e}", flush=True)
+        return None
+
+def cancel_order(symbol, product_id, order_id):
+    method = "DELETE"
+    path = "/v2/orders"
+    url = BASE_URL + path
+    payload_dict = {"id": order_id, "product_id": product_id}
+    payload = json.dumps(payload_dict)
+    headers = get_headers(method, path, "", payload)
+    try:
+        resp = requests.delete(url, data=payload, headers=headers, timeout=(3, 10))
+        return resp.json()
+    except Exception as e:
+        print(f"[{get_ist_time()}][{symbol}] Error cancelling order {order_id}: {e}", flush=True)
+        return None
+
 def place_market_order_with_bracket(product_id, side, size, bracket_sl_price, bracket_tp_price):
+    """Used only for the emergency close fallback."""
     method = "POST"
     path = "/v2/orders"
     url = BASE_URL + path
@@ -196,24 +232,6 @@ def place_market_order_with_bracket(product_id, side, size, bracket_sl_price, br
         print(f"[{get_ist_time()}] Error placing market order with bracket: {e}", flush=True)
         return None
 
-def get_average_fill_price(order_response):
-    if not order_response or not order_response.get("success"):
-        return None, None
-
-    order = order_response.get("result", {})
-    fill_price = order.get("average_fill_price")
-    order_id = order.get("id")
-
-    retries = 8
-    while fill_price is None and retries > 0 and order_id:
-        time.sleep(0.5)
-        fresh = get_order_by_id(order_id)
-        if fresh and fresh.get("success"):
-            fill_price = fresh.get("result", {}).get("average_fill_price")
-        retries -= 1
-
-    return (float(fill_price) if fill_price else None), order_id
-
 def emergency_close_position(symbol, product_id, side, quantity):
     close_side = "sell" if side == "buy" else "buy"
     print(f"[{get_ist_time()}][{symbol}] EMERGENCY CLOSE triggered -> closing naked position via market {close_side} order", flush=True)
@@ -229,6 +247,7 @@ def edit_bracket_order(symbol, product_id, order_id, sl_price=None, tp_price=Non
     payload_dict = {
         "id": order_id,
         "product_id": product_id,
+        "product_symbol": symbol,
     }
     if sl_price is not None:
         payload_dict["bracket_stop_loss_price"] = str(sl_price)
@@ -297,36 +316,95 @@ def evaluate_candle_data(symbol, candle, narrow_range_pct):
         bot_states[symbol]["status"] = f"Monitoring (Range: {round(range_pct, 2)}%)"
         return None
 
-# ==================== TRADE EXECUTION ====================
-def execute_breakout_trade(symbol, cfg, side, reference_candle, estimated_entry_price):
+# ==================== BREAKOUT STOP-ORDER PAIR (entry fix) ====================
+def place_breakout_stop_pair(symbol, cfg, ref_candle):
+    """Places BOTH a buy-stop (at candle High) and a sell-stop (at candle
+    Low) at candle-close time, immediately. The exchange itself triggers
+    whichever level price reaches first - this replaces the old
+    poll-mark-price-then-fire-market-order approach that was causing entries
+    far away from the candle High/Low."""
     product_id = cfg["product_id"]
     quantity = cfg["quantity"]
+    tick_size = cfg["tick_size"]
+
+    buy_stop_price = round_to_tick(ref_candle["high"], tick_size)
+    sell_stop_price = round_to_tick(ref_candle["low"], tick_size)
+    buy_stop_str = format_price(buy_stop_price, tick_size)
+    sell_stop_str = format_price(sell_stop_price, tick_size)
+    buy_sl_str = sell_stop_str   # SL for the buy side = candle Low
+    sell_sl_str = buy_stop_str   # SL for the sell side = candle High
+
+    buy_resp = place_stop_entry_order(symbol, product_id, "buy", quantity, buy_stop_str, buy_sl_str)
+    if not buy_resp or not buy_resp.get("success"):
+        print(f"[{get_ist_time()}][{symbol}] BUY stop entry order FAILED -> {buy_resp}", flush=True)
+        return None
+    buy_id = buy_resp["result"]["id"]
+
+    sell_resp = place_stop_entry_order(symbol, product_id, "sell", quantity, sell_stop_str, sell_sl_str)
+    if not sell_resp or not sell_resp.get("success"):
+        print(f"[{get_ist_time()}][{symbol}] SELL stop entry order FAILED -> {sell_resp}. Cancelling BUY stop (id {buy_id}).", flush=True)
+        cancel_order(symbol, product_id, buy_id)
+        return None
+    sell_id = sell_resp["result"]["id"]
+
+    print(f"[{get_ist_time()}][{symbol}] Breakout stop pair placed -> BUY stop @ {buy_stop_str} (id {buy_id}) | SELL stop @ {sell_stop_str} (id {sell_id})", flush=True)
+    bot_states[symbol]["status"] = f"Waiting for breakout (Buy@{buy_stop_str} / Sell@{sell_stop_str})"
+
+    return {
+        "buy_id": buy_id,
+        "sell_id": sell_id,
+        "buy_stop": buy_stop_price,
+        "sell_stop": sell_stop_price,
+    }
+
+def cancel_pending_entry_pair(symbol, product_id, pending_entry):
+    cancel_order(symbol, product_id, pending_entry["buy_id"])
+    cancel_order(symbol, product_id, pending_entry["sell_id"])
+    print(f"[{get_ist_time()}][{symbol}] Cancelled stale pending stop-order pair (buy id {pending_entry['buy_id']}, sell id {pending_entry['sell_id']})", flush=True)
+
+def check_pending_entries(symbol, cfg, sym_state):
+    """Polls both pending stop orders. Whichever one fills first becomes the
+    live position; the other one is cancelled immediately (manual OCO,
+    since Delta's API does not support native OCO)."""
+    pe = sym_state["pending_entry"]
+    product_id = cfg["product_id"]
     rr_ratio = cfg["rr_ratio"]
     tick_size = cfg["tick_size"]
 
-    if side == "buy":
-        initial_sl = round_to_tick(reference_candle["low"], tick_size)
-        est_sl_distance = estimated_entry_price - initial_sl
-        est_tp = round_to_tick(estimated_entry_price + (rr_ratio * est_sl_distance), tick_size)
-    else:
-        initial_sl = round_to_tick(reference_candle["high"], tick_size)
-        est_sl_distance = initial_sl - estimated_entry_price
-        est_tp = round_to_tick(estimated_entry_price - (rr_ratio * est_sl_distance), tick_size)
+    buy_resp = get_order_by_id(pe["buy_id"])
+    sell_resp = get_order_by_id(pe["sell_id"])
+    buy_result = buy_resp.get("result", {}) if buy_resp and buy_resp.get("success") else {}
+    sell_result = sell_resp.get("result", {}) if sell_resp and sell_resp.get("success") else {}
 
-    initial_sl_str = format_price(initial_sl, tick_size)
-    est_tp_str = format_price(est_tp, tick_size)
+    buy_state = buy_result.get("state")
+    sell_state = sell_result.get("state")
 
-    order_resp = place_market_order_with_bracket(product_id, side, quantity, initial_sl_str, est_tp_str)
-    if not order_resp or not order_resp.get("success"):
-        print(f"[{get_ist_time()}][{symbol}] Market order with bracket FAILED -> {order_resp}", flush=True)
-        return None
+    filled_result = None
+    filled_side = None
+    other_id = None
+    other_state = None
 
-    entry_price, order_id = get_average_fill_price(order_resp)
-    if entry_price is None:
-        print(f"[{get_ist_time()}][{symbol}] WARNING: Could not fetch exact fill price after retries. Using estimated entry ({estimated_entry_price}) for tracking.", flush=True)
-        entry_price = estimated_entry_price
-    else:
-        if side == "buy":
+    if buy_state == "closed" and buy_result.get("average_fill_price"):
+        filled_result = buy_result
+        filled_side = "buy"
+        other_id = pe["sell_id"]
+        other_state = sell_state
+    elif sell_state == "closed" and sell_result.get("average_fill_price"):
+        filled_result = sell_result
+        filled_side = "sell"
+        other_id = pe["buy_id"]
+        other_state = buy_state
+
+    if filled_result:
+        if other_state not in ("closed", "cancelled"):
+            cancel_resp = cancel_order(symbol, product_id, other_id)
+            print(f"[{get_ist_time()}][{symbol}] Opposite pending order (id {other_id}) cancelled -> {cancel_resp}", flush=True)
+
+        entry_price = float(filled_result["average_fill_price"])
+        order_id = filled_result["id"]
+        initial_sl = pe["sell_stop"] if filled_side == "buy" else pe["buy_stop"]
+
+        if filled_side == "buy":
             exact_sl_distance = entry_price - initial_sl
             exact_tp = round_to_tick(entry_price + (rr_ratio * exact_sl_distance), tick_size)
         else:
@@ -334,41 +412,47 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle, estimated_entry_
             exact_tp = round_to_tick(entry_price - (rr_ratio * exact_sl_distance), tick_size)
 
         exact_tp_str = format_price(exact_tp, tick_size)
-        if exact_tp_str != est_tp_str:
-            correction = edit_bracket_order(symbol, product_id, order_id, tp_price=exact_tp_str)
-            if correction and correction.get("success"):
-                print(f"[{get_ist_time()}][{symbol}] TP corrected for slippage -> {exact_tp_str}", flush=True)
-                est_tp = exact_tp
+        tp_result = edit_bracket_order(symbol, product_id, order_id, tp_price=exact_tp_str)
+        if tp_result and tp_result.get("success"):
+            print(f"[{get_ist_time()}][{symbol}] ENTRY FILLED {filled_side.upper()} @ {entry_price} (exact candle-cross trigger) | SL={initial_sl} | TP set to {exact_tp_str} (RR {rr_ratio})", flush=True)
+        else:
+            print(f"[{get_ist_time()}][{symbol}] ENTRY FILLED {filled_side.upper()} @ {entry_price} but TP attach FAILED -> {tp_result}. SL from placement is still active.", flush=True)
 
-    print(f"[{get_ist_time()}][{symbol}] ENTRY {side.upper()} @ {entry_price} | SL(candle)={initial_sl_str} | TP={format_price(est_tp, tick_size)}", flush=True)
+        bot_states[symbol]["status"] = f"{filled_side.upper()} Executed"
+        bot_states[symbol]["entry"] = entry_price
+        bot_states[symbol]["sl"] = initial_sl
+        bot_states[symbol]["tp"] = exact_tp
+        bot_states[symbol]["trail_level"] = 0
 
-    bot_states[symbol]["status"] = f"{side.upper()} Executed"
-    bot_states[symbol]["entry"] = entry_price
-    bot_states[symbol]["sl"] = initial_sl
-    bot_states[symbol]["tp"] = est_tp
-    bot_states[symbol]["trail_level"] = 0
+        sym_state["position"] = {
+            "symbol": symbol,
+            "side": filled_side.upper(),
+            "entry_price": entry_price,
+            "initial_sl": initial_sl,
+            "current_sl": initial_sl,
+            "tp_price": exact_tp,
+            "order_id": order_id,
+            "trail_steps": 0,
+            "entry_time": get_ist_time()
+        }
+        sym_state["pending_entry"] = None
+        sym_state["reference_candle"] = None
 
-    return {
-        "symbol": symbol,
-        "side": side.upper(),
-        "entry_price": entry_price,
-        "initial_sl": initial_sl,
-        "current_sl": initial_sl,
-        "tp_price": est_tp,
-        "order_id": order_id,
-        "trail_steps": 0,
-        "entry_time": get_ist_time()
-    }
+    elif buy_state == "cancelled" and sell_state == "cancelled":
+        print(f"[{get_ist_time()}][{symbol}] Both pending stop orders are cancelled. Clearing pending entry.", flush=True)
+        sym_state["pending_entry"] = None
+        sym_state["reference_candle"] = None
 
 # ==================== BACKGROUND WORKER LOOP ====================
 def background_bot_loop():
-    print("Starting multi-symbol narrow-range breakout bot worker...", flush=True)
+    print("Starting XRPUSD narrow-range breakout bot worker...", flush=True)
     state = {}
     for symbol, cfg in SYMBOLS.items():
         next_close = get_next_candle_close_time(cfg["candle_resolution"])
         state[symbol] = {
             "next_close_time": next_close,
             "reference_candle": None,
+            "pending_entry": None,
             "position": None,
             "cooldown_until": 0,
             "pending_candle_start": None,
@@ -396,7 +480,8 @@ def background_bot_loop():
                         bot_states[symbol]["last_price"] = price
                         live_price = price
                     remaining = int(sym_state["cooldown_until"] - now)
-                    bot_states[symbol]["status"] = f"Paused - cooling down ({remaining}s left)"
+                    bot_states[symbol]["status"] = f"Paused (bracket failure) - cooling down ({remaining}s left)"
+                    print(f"[{get_ist_time()}][{symbol}] COOLDOWN active -> {remaining}s remaining | LivePrice: {live_price}", flush=True)
                     continue
 
                 if now >= sym_state["next_close_time"] and sym_state["pending_candle_start"] is None and sym_state["position"] is None:
@@ -407,12 +492,29 @@ def background_bot_loop():
                 if sym_state["pending_candle_start"] is not None:
                     candle = fetch_candle_by_start_time(symbol, resolution, sym_state["pending_candle_start"])
                     if candle:
-                        sym_state["reference_candle"] = evaluate_candle_data(symbol, candle, cfg["narrow_range_pct"])
+                        if sym_state["pending_entry"] is not None:
+                            cancel_pending_entry_pair(symbol, product_id, sym_state["pending_entry"])
+                            sym_state["pending_entry"] = None
+
+                        new_ref = evaluate_candle_data(symbol, candle, cfg["narrow_range_pct"])
+                        sym_state["reference_candle"] = new_ref
                         sym_state["pending_candle_start"] = None
                         sym_state["pending_deadline"] = None
+
+                        if new_ref is not None and sym_state["position"] is None:
+                            pe_result = place_breakout_stop_pair(symbol, cfg, new_ref)
+                            if pe_result:
+                                sym_state["pending_entry"] = pe_result
+                            else:
+                                sym_state["reference_candle"] = None
                     elif now > sym_state["pending_deadline"]:
+                        print(f"[{get_ist_time()}][{symbol}] Candle fetch FAILED after {CANDLE_FETCH_RETRY_WINDOW}s of retries. Skipping this candle.", flush=True)
+                        bot_states[symbol]["status"] = "Warning: Candle fetch failed"
                         sym_state["pending_candle_start"] = None
                         sym_state["pending_deadline"] = None
+
+                if sym_state["pending_entry"] is not None:
+                    check_pending_entries(symbol, cfg, sym_state)
 
                 if sym_state["position"] is not None:
                     pos = sym_state["position"]
@@ -451,6 +553,8 @@ def background_bot_loop():
                             "pnl": round(pnl, 2)
                         })
 
+                        print(f"[{get_ist_time()}][{symbol}] Position CLOSED. Entry={pos['entry_price']}, Exit={exit_price}, PnL={round(pnl,2)}", flush=True)
+
                         sym_state["position"] = None
                         bot_states[symbol]["status"] = "Flat / Monitoring"
                         bot_states[symbol]["entry"] = "-"
@@ -458,27 +562,21 @@ def background_bot_loop():
                         bot_states[symbol]["tp"] = "-"
                         bot_states[symbol]["trail_level"] = 0
 
-                elif sym_state["reference_candle"] is not None:
+                if live_price is None and sym_state["position"] is None and sym_state["pending_entry"] is None:
                     price = get_mark_price(symbol)
                     if price is not None:
                         bot_states[symbol]["last_price"] = price
                         live_price = price
-                        ref = sym_state["reference_candle"]
-                        if price > ref["high"]:
-                            result = execute_breakout_trade(symbol, cfg, "buy", ref, price)
-                            if result:
-                                sym_state["position"] = result
-                            sym_state["reference_candle"] = None
-                        elif price < ref["low"]:
-                            result = execute_breakout_trade(symbol, cfg, "sell", ref, price)
-                            if result:
-                                sym_state["position"] = result
-                            sym_state["reference_candle"] = None
-                else:
-                    price = get_mark_price(symbol)
-                    if price is not None:
-                        bot_states[symbol]["last_price"] = price
-                        live_price = price
+
+                ref = sym_state["reference_candle"]
+                ref_str = f"H:{ref['high']} L:{ref['low']}" if ref else "None"
+                pos_str = sym_state["position"]["side"] if sym_state["position"] else "NONE"
+                pending_str = ""
+                if sym_state["pending_candle_start"] is not None:
+                    pending_str = " [FETCHING CANDLE...]"
+                elif sym_state["pending_entry"] is not None:
+                    pending_str = " [STOP ORDERS PENDING...]"
+                print(f"[{get_ist_time()}][{symbol}] RefCandle -> {ref_str}{pending_str} | LivePrice: {live_price} | Position: {pos_str}", flush=True)
 
             time.sleep(POLL_INTERVAL)
         except Exception as e:
@@ -528,7 +626,7 @@ def dashboard():
     return f"""
     <html>
     <head>
-        <title>Multi-Coin TSL Dashboard</title>
+        <title>XRPUSD Breakout Bot Dashboard</title>
         <meta http-equiv="refresh" content="5">
         <style>
             body {{ background: #121212; color: #fff; font-family: Arial, sans-serif; padding: 20px; }}
@@ -545,7 +643,7 @@ def dashboard():
         </style>
     </head>
     <body>
-        <h1>Breakout & Stepped Trailing SL Multi-Coin Dashboard</h1>
+        <h1>XRPUSD Breakout & Stepped Trailing SL Dashboard</h1>
 
         <div class="portfolio-box">
             <h3>Total Portfolio Net P&L</h3>
