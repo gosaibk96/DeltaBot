@@ -33,63 +33,100 @@ RESOLUTION_SECONDS = {
 # configuration. Edit any coin's values without affecting others.
 # tick_size must match the product's tick size on Delta Exchange
 # (required for rounding SL/TP prices to valid values).
+#
+# NOTE: Trailing is handled natively by Delta Exchange using
+# trail_amount set once at entry (SL trails tick-by-tick on the
+# exchange side, keeping the same distance from price always).
+# trail_amount = |entry_price - candle_low_or_high| calculated at entry.
 # ============================================================
 
 SYMBOLS = {
-    "DOTUSD": {
-        "product_id": 15304,
-        "quantity": 100,
-        "tick_size": 0.001,
-        "candle_resolution": "1h",
-        "narrow_range_pct": 1.0,
-        "rr_ratio": 4,
-    },
     "XRPUSD": {
         "product_id": 14969,
-        "quantity": 150,
+        "quantity": 1,
         "tick_size": 0.0001,
-        "candle_resolution": "1h",
+        "candle_resolution": "5m",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
     },
-    "GRAMUSD": {
-        "product_id": 141650,
-        "quantity": 5,
-        "tick_size": 0.001,
-        "candle_resolution": "1h",
+    "SUIUSD": {
+        "product_id": 17328,
+        "quantity": 1,
+        "tick_size": 0.0001,
+        "candle_resolution": "5m",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
     },
-    "RIVERUSD": {
-        "product_id": 115664,
-        "quantity": 100,
-        "tick_size": 0.001,
-        "candle_resolution": "1h",
-        "narrow_range_pct": 1.0,
+    "EVAAUSD": {
+        "product_id": 98745,
+        "quantity": 0,
+        "tick_size": 0.0001,
+        "candle_resolution": "5m",
+        "narrow_range_pct": 0.5,
+        "rr_ratio": 4,
+    },
+    "COAIUSD": {
+        "product_id": 98572,
+        "quantity": 0,
+        "tick_size": 0.0001,
+        "candle_resolution": "5m",
+        "narrow_range_pct": 0.5,
+        "rr_ratio": 4,
+    },
+    "ASTERUSD": {
+        "product_id": 96160,
+        "quantity": 0,
+        "tick_size": 0.0001,
+        "candle_resolution": "5m",
+        "narrow_range_pct": 0.5,
         "rr_ratio": 4,
     },
     "MUSD": {
         "product_id": 84925,
-        "quantity": 5,
+        "quantity": 0,
         "tick_size": 0.0001,
-        "candle_resolution": "1h",
-        "narrow_range_pct": 1.0,
+        "candle_resolution": "5m",
+        "narrow_range_pct": 0.5,
         "rr_ratio": 4,
     },
     "ZROUSD": {
         "product_id": 26457,
-        "quantity": 200,
+        "quantity": 0,
         "tick_size": 0.0001,
-        "candle_resolution": "1h",
+        "candle_resolution": "5m",
+        "narrow_range_pct": 0.5,
+        "rr_ratio": 4,
+    },
+    "RUNEUSD": {
+        "product_id": 21522,
+        "quantity": 0,
+        "tick_size": 0.0001,
+        "candle_resolution": "5m",
+        "narrow_range_pct": 0.5,
+        "rr_ratio": 4,
+    },
+    "APTUSD": {
+        "product_id": 20196,
+        "quantity": 0,
+        "tick_size": 0.0001,
+        "candle_resolution": "5m",
         "narrow_range_pct": 0.5,
         "rr_ratio": 4,
     },
     "FILUSD": {
         "product_id": 19617,
-        "quantity": 100,
+        "quantity": 0,
         "tick_size": 0.0001,
-        "candle_resolution": "1h",
-        "narrow_range_pct": 1.0,
+        "candle_resolution": "5m",
+        "narrow_range_pct": 0.5,
+        "rr_ratio": 4,
+    },
+    "LDOUSD": {
+        "product_id": 19616,
+        "quantity": 0,
+        "tick_size": 0.0001,
+        "candle_resolution": "5m",
+        "narrow_range_pct": 0.5,
         "rr_ratio": 4,
     },
 }
@@ -268,23 +305,19 @@ def get_average_fill_price(order_response):
     return (float(fill_price) if fill_price else None), order_id
 
 
-def place_bracket_sl_tp(symbol, product_id, trail_amount, take_profit_price, tick_size):
+def place_bracket_sl_tp(symbol, product_id, trail_amount, take_profit_price):
     method = "POST"
     path = "/v2/orders/bracket"
     url = BASE_URL + path
-    
-    formatted_trail = format_price(trail_amount, tick_size)
-    formatted_tp = format_price(take_profit_price, tick_size)
-
     payload_dict = {
         "product_id": product_id,
         "stop_loss_order": {
             "order_type": "market_order",
-            "trail_amount": formatted_trail,
+            "trail_amount": str(trail_amount),
         },
         "take_profit_order": {
             "order_type": "market_order",
-            "stop_price": formatted_tp,
+            "stop_price": str(take_profit_price),
         },
         "bracket_stop_trigger_method": STOP_TRIGGER_METHOD,
     }
@@ -335,10 +368,12 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
 
     order_resp = place_market_order(product_id, side, quantity)
     if not order_resp or not order_resp.get("success"):
+        print(f"[{get_ist_time()}][{symbol}] Market order FAILED -> {order_resp}", flush=True)
         return None
 
     entry_price, order_id = get_average_fill_price(order_resp)
     if entry_price is None:
+        print(f"[{get_ist_time()}][{symbol}] Could not fetch average fill price, aborting bracket setup", flush=True)
         return None
 
     if side == "buy":
@@ -351,6 +386,13 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
         tp_price = round_to_tick(entry_price - (rr_ratio * sl_distance), tick_size)
 
     trail_amount = round_to_tick(sl_distance, tick_size)
+    if trail_amount < tick_size:
+        trail_amount = tick_size
+
+    trail_amount_str = format_price(trail_amount, tick_size)
+    tp_price_str = format_price(tp_price, tick_size)
+
+    print(f"[{get_ist_time()}][{symbol}] ENTRY {side.upper()} @ {entry_price} | SL(ref)={sl_price} | trail_amount={trail_amount_str} | TP={tp_price_str}", flush=True)
 
     bot_states[symbol]["status"] = f"{side.upper()} Executed"
     bot_states[symbol]["entry"] = entry_price
@@ -358,7 +400,7 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
     bot_states[symbol]["tp"] = tp_price
     bot_states[symbol]["trail_level"] = 0
 
-    place_bracket_sl_tp(symbol, product_id, trail_amount, tp_price, tick_size)
+    place_bracket_sl_tp(symbol, product_id, trail_amount_str, tp_price_str)
 
     return {
         "symbol": symbol,
@@ -394,6 +436,7 @@ def background_bot_loop():
                 product_id = cfg["product_id"]
                 resolution = cfg["candle_resolution"]
                 candle_seconds = get_candle_seconds(resolution)
+                live_price = None
 
                 if now >= sym_state["next_close_time"] + 2:
                     if sym_state["position"] is None:
@@ -409,6 +452,7 @@ def background_bot_loop():
                         pos = sym_state["position"]
                         exit_time = get_ist_time()
                         price = get_mark_price(symbol) or pos["entry_price"]
+                        live_price = price
 
                         if pos["side"] == "BUY":
                             pnl = (price - pos["entry_price"]) * cfg["quantity"]
@@ -434,6 +478,8 @@ def background_bot_loop():
                             "pnl": round(pnl, 2)
                         })
 
+                        print(f"[{get_ist_time()}][{symbol}] Position CLOSED. Entry={pos['entry_price']}, Exit={price}, PnL={round(pnl,2)}", flush=True)
+
                         sym_state["position"] = None
                         bot_states[symbol]["status"] = "Flat / Monitoring"
                         bot_states[symbol]["entry"] = "-"
@@ -444,11 +490,13 @@ def background_bot_loop():
                         price = get_mark_price(symbol)
                         if price is not None:
                             bot_states[symbol]["last_price"] = price
+                            live_price = price
 
                 elif sym_state["reference_candle"] is not None:
                     price = get_mark_price(symbol)
                     if price is not None:
                         bot_states[symbol]["last_price"] = price
+                        live_price = price
                         ref = sym_state["reference_candle"]
                         if price > ref["high"]:
                             result = execute_breakout_trade(symbol, cfg, "buy", ref)
@@ -464,6 +512,12 @@ def background_bot_loop():
                     price = get_mark_price(symbol)
                     if price is not None:
                         bot_states[symbol]["last_price"] = price
+                        live_price = price
+
+                ref = sym_state["reference_candle"]
+                ref_str = f"H:{ref['high']} L:{ref['low']}" if ref else "None"
+                pos_str = sym_state["position"]["side"] if sym_state["position"] else "NONE"
+                print(f"[{get_ist_time()}][{symbol}] RefCandle -> {ref_str} | LivePrice: {live_price} | Position: {pos_str}", flush=True)
 
             time.sleep(POLL_INTERVAL)
         except Exception as e:
@@ -488,7 +542,7 @@ def dashboard():
             <div class="row"><span>Status:</span> <b>{st['status']}</b></div>
             <div class="row"><span>Last Price:</span> <b>{st['last_price']}</b></div>
             <div class="row"><span>Entry Price:</span> <b>{st['entry']}</b></div>
-            <div class="row"><span>Active SL / TP:</span> <b>{st['sl']} / {st['tp']}</b></div>
+            <div class="row"><span>Initial SL / TP:</span> <b>{st['sl']} / {st['tp']}</b></div>
             <div class="row"><span>Total Trades:</span> <b>{t_trades}</b></div>
             <div class="row"><span>Wins / Losses:</span> <b>{st['wins']} / {st['losses']}</b></div>
             <div class="row"><span>Net P&L:</span> <b style="color:{s_pnl_color};">${st['net_pnl']:.2f}</b></div>
@@ -530,20 +584,20 @@ def dashboard():
         </style>
     </head>
     <body>
-        <h1>🚀 Breakout & TSL Multi-Coin Dashboard</h1>
-        
+        <h1>Breakout & Native Trailing SL Multi-Coin Dashboard</h1>
+
         <div class="portfolio-box">
             <h3>Total Portfolio Net P&L</h3>
             <h2 style="color: {pnl_color}; margin: 5px 0;">${total_pnl:.2f}</h2>
             <p style="margin: 0; color: #888;">Total Trades Executed: {total_trades}</p>
         </div>
 
-        <h2>📊 Coin-wise Performance Cards</h2>
+        <h2>Coin-wise Performance Cards</h2>
         <div class="grid">
             {cards_html}
         </div>
 
-        <h2>📜 Live Executed Trade Logs</h2>
+        <h2>Live Executed Trade Logs</h2>
         <table>
             <tr>
                 <th>Entry Time</th>
