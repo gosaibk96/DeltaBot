@@ -29,111 +29,25 @@ RESOLUTION_SECONDS = {
 }
 
 # ============================================================
-# PER-COIN SETTINGS - Each coin has its own fully independent
-# configuration. Edit any coin's values without affecting others.
-# tick_size must match the product's tick size on Delta Exchange
-# (required for rounding SL/TP prices to valid values).
-#
-# NOTE: Trailing is handled natively by Delta Exchange using
-# trail_amount set once at entry (SL trails tick-by-tick on the
-# exchange side, keeping the same distance from price always).
-# trail_amount = |entry_price - candle_low_or_high| calculated at entry.
+# PER-COIN SETTINGS
 # ============================================================
 
 SYMBOLS = {
-    "XRPUSD": {
-        "product_id": 14969,
-        "quantity": 1,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "SUIUSD": {
-        "product_id": 17328,
-        "quantity": 1,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "EVAAUSD": {
-        "product_id": 98745,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "COAIUSD": {
-        "product_id": 98572,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "ASTERUSD": {
-        "product_id": 96160,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "MUSD": {
-        "product_id": 84925,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "ZROUSD": {
-        "product_id": 26457,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "RUNEUSD": {
-        "product_id": 21522,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "APTUSD": {
-        "product_id": 20196,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "FILUSD": {
-        "product_id": 19617,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
-    "LDOUSD": {
-        "product_id": 19616,
-        "quantity": 0,
-        "tick_size": 0.0001,
-        "candle_resolution": "5m",
-        "narrow_range_pct": 0.5,
-        "rr_ratio": 4,
-    },
+    "XRPUSD": {"product_id": 14969, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 1.0, "rr_ratio": 4},
+    "SUIUSD": {"product_id": 17328, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 1.0, "rr_ratio": 4},
+    "EVAAUSD": {"product_id": 98745, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "COAIUSD": {"product_id": 98572, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "ASTERUSD": {"product_id": 96160, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "MUSD": {"product_id": 84925, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "ZROUSD": {"product_id": 26457, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "RUNEUSD": {"product_id": 21522, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "APTUSD": {"product_id": 20196, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "FILUSD": {"product_id": 19617, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "LDOUSD": {"product_id": 19616, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
 }
 
 # ============================================================
 
-# Global Data Store for Dashboard & API Tracking
 trade_history = []
 bot_states = {sym: {"status": "Initializing", "last_price": 0.0, "entry": "-", "sl": "-", "tp": "-", "trail_level": 0, "wins": 0, "losses": 0, "net_pnl": 0.0} for sym in SYMBOLS}
 
@@ -147,29 +61,23 @@ def get_candle_seconds(resolution):
     return RESOLUTION_SECONDS.get(resolution, 3600)
 
 def round_to_tick(price, tick_size):
-    """Round price to the nearest valid tick size multiple."""
     if tick_size <= 0:
         return price
     rounded = round(price / tick_size) * tick_size
     decimals = max(0, -int(math.floor(math.log10(tick_size))) if tick_size < 1 else 0)
     return round(rounded, decimals + 2)
 
-
 def format_price(value, tick_size):
-    """Formats a price/amount as a plain decimal string (never scientific
-    notation like '5e-05'), with decimal places matching the tick size."""
     d = Decimal(str(tick_size))
     exponent = d.as_tuple().exponent
     decimals = -exponent if exponent < 0 else 0
     return f"{float(value):.{decimals}f}"
-
 
 # ==================== SIGNATURE HELPER ====================
 def generate_signature(secret, message):
     message = bytes(message, "utf-8")
     secret = bytes(secret, "utf-8")
     return hmac.new(secret, message, hashlib.sha256).hexdigest()
-
 
 def get_headers(method, path, query_string="", payload=""):
     timestamp = str(int(time.time()))
@@ -183,13 +91,11 @@ def get_headers(method, path, query_string="", payload=""):
         "Content-Type": "application/json",
     }
 
-
 # ==================== CANDLE BOUNDARY HELPERS ====================
 def get_next_candle_close_time(resolution):
     candle_seconds = get_candle_seconds(resolution)
     now = time.time()
     return (int(now) // candle_seconds + 1) * candle_seconds
-
 
 # ==================== MARKET DATA FUNCTIONS ====================
 def fetch_candle_by_start_time(symbol, resolution, expected_start_time):
@@ -216,7 +122,6 @@ def fetch_candle_by_start_time(symbol, resolution, expected_start_time):
         print(f"[{get_ist_time()}][{symbol}] Error fetching candles: {e}", flush=True)
         return None
 
-
 def get_mark_price(symbol):
     path = f"/v2/tickers/{symbol}"
     url = BASE_URL + path
@@ -229,7 +134,6 @@ def get_mark_price(symbol):
     except Exception as e:
         print(f"[{get_ist_time()}][{symbol}] Error fetching ticker: {e}", flush=True)
         return None
-
 
 def get_position_size(product_id):
     method = "GET"
@@ -251,7 +155,6 @@ def get_position_size(product_id):
         print(f"[{get_ist_time()}] Error fetching position for product_id {product_id}: {e}", flush=True)
         return 0
 
-
 def get_order_by_id(order_id):
     method = "GET"
     path = f"/v2/orders/{order_id}"
@@ -263,7 +166,6 @@ def get_order_by_id(order_id):
     except Exception as e:
         print(f"[{get_ist_time()}] Error fetching order: {e}", flush=True)
         return None
-
 
 # ==================== ORDER FUNCTIONS ====================
 def place_market_order(product_id, side, size):
@@ -285,7 +187,6 @@ def place_market_order(product_id, side, size):
         print(f"[{get_ist_time()}] Error placing market order: {e}", flush=True)
         return None
 
-
 def get_average_fill_price(order_response):
     if not order_response or not order_response.get("success"):
         return None, None
@@ -294,7 +195,7 @@ def get_average_fill_price(order_response):
     fill_price = order.get("average_fill_price")
     order_id = order.get("id")
 
-    retries = 5
+    retries = 8
     while fill_price is None and retries > 0 and order_id:
         time.sleep(0.5)
         fresh = get_order_by_id(order_id)
@@ -304,6 +205,13 @@ def get_average_fill_price(order_response):
 
     return (float(fill_price) if fill_price else None), order_id
 
+def emergency_close_position(symbol, product_id, side, quantity):
+    close_side = "sell" if side == "buy" else "buy"
+    print(f"[{get_ist_time()}][{symbol}] EMERGENCY CLOSE triggered -> closing naked position via market {close_side} order", flush=True)
+    resp = place_market_order(product_id, close_side, quantity)
+    if not resp or not resp.get("success"):
+        print(f"[{get_ist_time()}][{symbol}] CRITICAL: Emergency close FAILED -> {resp}. Manual intervention required!", flush=True)
+    return resp
 
 def place_bracket_sl_tp(symbol, product_id, trail_amount, take_profit_price):
     method = "POST"
@@ -333,7 +241,6 @@ def place_bracket_sl_tp(symbol, product_id, trail_amount, take_profit_price):
         print(f"[{get_ist_time()}][{symbol}] Error placing bracket order: {e}", flush=True)
         return None
 
-
 # ==================== CANDLE EVALUATION ====================
 def evaluate_closed_candle(symbol, resolution, narrow_range_pct, candle_start_time):
     candle = fetch_candle_by_start_time(symbol, resolution, candle_start_time)
@@ -358,7 +265,6 @@ def evaluate_closed_candle(symbol, resolution, narrow_range_pct, candle_start_ti
         bot_states[symbol]["status"] = f"Monitoring (Range: {round(range_pct, 2)}%)"
         return None
 
-
 # ==================== TRADE EXECUTION ====================
 def execute_breakout_trade(symbol, cfg, side, reference_candle):
     product_id = cfg["product_id"]
@@ -373,7 +279,22 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
 
     entry_price, order_id = get_average_fill_price(order_resp)
     if entry_price is None:
-        print(f"[{get_ist_time()}][{symbol}] Could not fetch average fill price, aborting bracket setup", flush=True)
+        print(f"[{get_ist_time()}][{symbol}] CRITICAL: Could not fetch average fill price after retries.", flush=True)
+        size = get_position_size(product_id)
+        if size != 0:
+            emergency_close_position(symbol, product_id, side, quantity)
+        return None
+
+    position_confirmed = False
+    for _ in range(5):
+        size = get_position_size(product_id)
+        if size != 0:
+            position_confirmed = True
+            break
+        time.sleep(0.5)
+
+    if not position_confirmed:
+        print(f"[{get_ist_time()}][{symbol}] CRITICAL: Position not confirmed on exchange after entry. Skipping bracket setup.", flush=True)
         return None
 
     if side == "buy":
@@ -394,13 +315,25 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
 
     print(f"[{get_ist_time()}][{symbol}] ENTRY {side.upper()} @ {entry_price} | SL(ref)={sl_price} | trail_amount={trail_amount_str} | TP={tp_price_str}", flush=True)
 
+    bracket_success = False
+    for attempt in range(1, 4):
+        bracket_resp = place_bracket_sl_tp(symbol, product_id, trail_amount_str, tp_price_str)
+        if bracket_resp and bracket_resp.get("success"):
+            bracket_success = True
+            break
+        print(f"[{get_ist_time()}][{symbol}] Bracket placement attempt {attempt}/3 failed. Retrying...", flush=True)
+        time.sleep(1)
+
+    if not bracket_success:
+        print(f"[{get_ist_time()}][{symbol}] CRITICAL: Bracket SL/TP could not be placed after 3 attempts. Closing naked position for safety.", flush=True)
+        emergency_close_position(symbol, product_id, side, quantity)
+        return None
+
     bot_states[symbol]["status"] = f"{side.upper()} Executed"
     bot_states[symbol]["entry"] = entry_price
     bot_states[symbol]["sl"] = sl_price
     bot_states[symbol]["tp"] = tp_price
     bot_states[symbol]["trail_level"] = 0
-
-    place_bracket_sl_tp(symbol, product_id, trail_amount_str, tp_price_str)
 
     return {
         "symbol": symbol,
@@ -412,7 +345,6 @@ def execute_breakout_trade(symbol, cfg, side, reference_candle):
         "trail_level": 0,
         "entry_time": get_ist_time()
     }
-
 
 # ==================== BACKGROUND WORKER LOOP ====================
 def background_bot_loop():
@@ -502,12 +434,12 @@ def background_bot_loop():
                             result = execute_breakout_trade(symbol, cfg, "buy", ref)
                             if result:
                                 sym_state["position"] = result
-                                sym_state["reference_candle"] = None
+                            sym_state["reference_candle"] = None
                         elif price < ref["low"]:
                             result = execute_breakout_trade(symbol, cfg, "sell", ref)
                             if result:
                                 sym_state["position"] = result
-                                sym_state["reference_candle"] = None
+                            sym_state["reference_candle"] = None
                 else:
                     price = get_mark_price(symbol)
                     if price is not None:
@@ -523,7 +455,6 @@ def background_bot_loop():
         except Exception as e:
             print(f"[{get_ist_time()}] Main loop error: {e}", flush=True)
             time.sleep(POLL_INTERVAL)
-
 
 # ==================== FLASK WEB DASHBOARD & APIS ====================
 @app.route("/")
