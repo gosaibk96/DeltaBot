@@ -67,7 +67,7 @@ SYMBOLS = {
     },
     "PIEVERSEUSD": {
         "product_id": 131978,
-        "quantity": 20,
+        "quantity": 10,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
         "narrow_range_pct": 1.0,
@@ -107,10 +107,10 @@ SYMBOLS = {
     },
     "FILUSD": {
         "product_id": 19617,
-        "quantity": 200,
+        "quantity": 100,
         "tick_size": 0.0001,
         "candle_resolution": "1h",
-        "narrow_range_pct": 0.5,
+        "narrow_range_pct": 1.0,
         "rr_ratio": 4,
         "trail_trigger_pct": 0.1,
         "trail_step_pct": 0.1,
