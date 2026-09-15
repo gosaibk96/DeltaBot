@@ -35,11 +35,11 @@ RESOLUTION_SECONDS = {
 # ============================================================
 
 SYMBOLS = {
-    "XRPUSD": {"product_id": 14969, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "10m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "SUIUSD": {"product_id": 17328, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "10m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "EVAAUSD": {"product_id": 98745, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "10m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "COAIUSD": {"product_id": 98572, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "10m", "narrow_range_pct": 0.5, "rr_ratio": 4},
-    "ASTERUSD": {"product_id": 96160, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "XRPUSD": {"product_id": 14969, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "SUIUSD": {"product_id": 17328, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "EVAAUSD": {"product_id": 98745, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "COAIUSD": {"product_id": 98572, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
+    "ASTERUSD": {"product_id": 96160, "quantity": 1, "tick_size": 0.0001, "candle_resolution": "15m", "narrow_range_pct": 0.5, "rr_ratio": 4},
     "MUSD": {"product_id": 84925, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
     "ZROUSD": {"product_id": 26457, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
     "RUNEUSD": {"product_id": 21522, "quantity": 0, "tick_size": 0.0001, "candle_resolution": "5m", "narrow_range_pct": 0.5, "rr_ratio": 4},
