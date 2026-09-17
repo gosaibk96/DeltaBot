@@ -310,7 +310,7 @@ def on_ws_message(ws, message):
         msg_type = data.get("type")
 
         if msg_type == "mark_price":
-            raw_price = data.get("p")
+            raw_price = data.get("price")
             if raw_price is None:
                 log("WS mark_price message received with null price. Raw: " + str(data))
                 return
