@@ -270,14 +270,12 @@ def evaluate_candle_data(candle):
 def execute_breakout_trade(side, trigger_price):
     if side == "buy":
         tp_price = trigger_price + (RR_RATIO * SL_TRAIL_POINTS)
-        trail_amount_value = -SL_TRAIL_POINTS
     else:
         tp_price = trigger_price - (RR_RATIO * SL_TRAIL_POINTS)
-        trail_amount_value = SL_TRAIL_POINTS
 
     tp_price = round_to_tick(tp_price, TICK_SIZE)
     tp_price_str = format_price(tp_price, TICK_SIZE)
-    trail_amount_str = format_price(trail_amount_value, TICK_SIZE)
+    trail_amount_str = format_price(SL_TRAIL_POINTS, TICK_SIZE)
 
     log("BREAKOUT DETECTED -> Placing " + side.upper() + " market order | qty=" + str(QUANTITY) + " lot(s) | Trailing SL=" + trail_amount_str + " pts | TP=" + tp_price_str)
 
@@ -509,3 +507,5 @@ if __name__ == "__main__":
 
     log("Bot started. Symbol=" + SYMBOL + ", Resolution=" + CANDLE_RESOLUTION + ", Range<= " + str(CANDLE_RANGE_MAX_POINTS) + "pts, SL(trail)=" + str(SL_TRAIL_POINTS) + "pts, RR=1:" + str(RR_RATIO) + ", Qty=" + str(QUANTITY) + " lot(s)")
 
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
