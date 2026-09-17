@@ -11,24 +11,17 @@ from decimal import Decimal
 from datetime import datetime
 import pytz
 
-# ============================================================
-# CREDENTIALS (set these in Render -> Environment)
-# ============================================================
 API_KEY = os.environ.get("API_KEY", "your_api_key_here")
 API_SECRET = os.environ.get("API_SECRET", "your_api_secret_here")
 
 BASE_URL = "https://api.india.delta.exchange"
 WS_URL = "wss://socket.india.delta.exchange"
 
-# ============================================================
-# EASILY CHANGEABLE STRATEGY SETTINGS (BTCUSD)
-# ============================================================
-
 SYMBOL = "BTCUSD"
 PRODUCT_ID = 27
 TICK_SIZE = 0.5
 CANDLE_RESOLUTION = "1h"
-QUANTITY = 1  # in lots
+QUANTITY = 1
 
 CANDLE_RANGE_MIN_POINTS = 0
 CANDLE_RANGE_MAX_POINTS = 200
@@ -38,12 +31,7 @@ RR_RATIO = 4
 
 STOP_TRIGGER_METHOD = "mark_price"
 
-# ============================================================
-RESOLUTION_SECONDS = {
-    "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800,
-    "1h": 3600, "2h": 7200, "4h": 14400, "6h": 21600,
-    "1d": 86400, "1w": 604800
-}
+RESOLUTION_SECONDS = {"1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "2h": 7200, "4h": 14400, "6h": 21600, "1d": 86400, "1w": 604800}
 
 CANDLE_WATCHER_TICK = 1
 POSITION_WATCHER_INTERVAL = 2
@@ -72,7 +60,7 @@ def get_ist_time():
 
 
 def log(msg):
-    print(f"[{get_ist_time()}][{SYMBOL}] {msg}", flush=True)
+    print("[" + get_ist_time() + "][" + SYMBOL + "] " + str(msg), flush=True)
 
 
 def get_candle_seconds(resolution):
@@ -89,7 +77,7 @@ def format_price(value, tick_size):
     d = Decimal(str(tick_size))
     exponent = d.as_tuple().exponent
     decimals = -exponent if exponent < 0 else 0
-    return f"{float(value):.{decimals}f}"
+    return "{:.{}f}".format(float(value), decimals)
 
 
 def generate_signature(secret, message):
@@ -102,13 +90,7 @@ def get_headers(method, path, query_string="", payload=""):
     timestamp = str(int(time.time()))
     signature_data = method + timestamp + path + query_string + payload
     signature = generate_signature(API_SECRET, signature_data)
-    return {
-        "api-key": API_KEY,
-        "timestamp": timestamp,
-        "signature": signature,
-        "User-Agent": "render-btcusd-breakout-bot",
-        "Content-Type": "application/json",
-    }
+    return {"api-key": API_KEY, "timestamp": timestamp, "signature": signature, "User-Agent": "render-btcusd-breakout-bot", "Content-Type": "application/json"}
 
 
 def get_next_candle_close_time(resolution):
@@ -122,12 +104,7 @@ def fetch_candle_by_start_time(resolution, expected_start_time):
     end_ts = int(time.time())
     start_ts = expected_start_time - (candle_seconds * 3)
     url = BASE_URL + "/v2/history/candles"
-    params = {
-        "resolution": resolution,
-        "symbol": SYMBOL,
-        "start": start_ts,
-        "end": end_ts,
-    }
+    params = {"resolution": resolution, "symbol": SYMBOL, "start": start_ts, "end": end_ts}
     try:
         resp = requests.get(url, params=params, timeout=(3, 10))
         data = resp.json()
@@ -137,14 +114,14 @@ def fetch_candle_by_start_time(resolution, expected_start_time):
                     return c
         return None
     except Exception as e:
-        log(f"Error fetching candles: {e}")
+        log("Error fetching candles: " + str(e))
         return None
 
 
 def get_position_size_and_entry():
     method = "GET"
     path = "/v2/positions"
-    query_string = f"?product_id={PRODUCT_ID}"
+    query_string = "?product_id=" + str(PRODUCT_ID)
     url = BASE_URL + path
     headers = get_headers(method, path, query_string)
     try:
@@ -156,20 +133,20 @@ def get_position_size_and_entry():
                 return int(result["size"]), result.get("entry_price")
         return 0, None
     except Exception as e:
-        log(f"Error fetching position: {e}")
+        log("Error fetching position: " + str(e))
         return None, None
 
 
 def get_order_by_id(order_id):
     method = "GET"
-    path = f"/v2/orders/{order_id}"
+    path = "/v2/orders/" + str(order_id)
     url = BASE_URL + path
     headers = get_headers(method, path)
     try:
         resp = requests.get(url, headers=headers, timeout=(3, 10))
         return resp.json()
     except Exception as e:
-        log(f"Error fetching order: {e}")
+        log("Error fetching order: " + str(e))
         return None
 
 
@@ -193,13 +170,13 @@ def place_entry_order_with_trailing_bracket(side, size, trail_amount_str, tp_pri
         resp = requests.post(url, data=payload, headers=headers, timeout=(3, 10))
         return resp.json()
     except Exception as e:
-        log(f"Error placing entry order: {e}")
+        log("Error placing entry order: " + str(e))
         return None
 
 
 def emergency_close_position(side, quantity):
     close_side = "sell" if side == "buy" else "buy"
-    log(f"EMERGENCY CLOSE triggered -> closing naked position via reduce-only market {close_side} order")
+    log("EMERGENCY CLOSE triggered -> closing naked position via reduce-only market " + close_side + " order")
     method = "POST"
     path = "/v2/orders"
     url = BASE_URL + path
@@ -217,10 +194,10 @@ def emergency_close_position(side, quantity):
         resp = requests.post(url, data=payload, headers=headers, timeout=(3, 10))
         result = resp.json()
         if not result.get("success"):
-            log(f"CRITICAL: Emergency close FAILED -> {result}. Manual intervention required!")
+            log("CRITICAL: Emergency close FAILED -> " + str(result) + ". Manual intervention required!")
         return result
     except Exception as e:
-        log(f"CRITICAL: Emergency close request error: {e}. Manual intervention required!")
+        log("CRITICAL: Emergency close request error: " + str(e) + ". Manual intervention required!")
         return None
 
 
@@ -240,10 +217,7 @@ def evaluate_candle_data(candle):
     low = float(candle["low"])
     range_points = round(high - low, 8)
     qualifies = CANDLE_RANGE_MIN_POINTS <= range_points <= CANDLE_RANGE_MAX_POINTS
-
-    log(f"Closed Candle -> High: {high}, Low: {low}, Range: {range_points} pts, "
-        f"Required: <= {CANDLE_RANGE_MAX_POINTS} pts, Qualifies: {qualifies}")
-
+    log("Closed Candle -> High: " + str(high) + ", Low: " + str(low) + ", Range: " + str(range_points) + " pts, Required: <= " + str(CANDLE_RANGE_MAX_POINTS) + " pts, Qualifies: " + str(qualifies))
     if qualifies:
         return {"high": high, "low": low}
     return None
@@ -259,12 +233,11 @@ def execute_breakout_trade(side, trigger_price):
     tp_price_str = format_price(tp_price, TICK_SIZE)
     trail_amount_str = format_price(SL_TRAIL_POINTS, TICK_SIZE)
 
-    log(f"BREAKOUT DETECTED -> Placing {side.upper()} market order | qty={QUANTITY} lot(s) | "
-        f"Trailing SL={trail_amount_str} pts | TP={tp_price_str}")
+    log("BREAKOUT DETECTED -> Placing " + side.upper() + " market order | qty=" + str(QUANTITY) + " lot(s) | Trailing SL=" + trail_amount_str + " pts | TP=" + tp_price_str)
 
     order_resp = place_entry_order_with_trailing_bracket(side, QUANTITY, trail_amount_str, tp_price_str)
     if not order_resp or not order_resp.get("success"):
-        log(f"ORDER FAILED -> {order_resp}")
+        log("ORDER FAILED -> " + str(order_resp))
         return False, False
 
     result = order_resp.get("result", {})
@@ -274,4 +247,194 @@ def execute_breakout_trade(side, trigger_price):
     returned_tp = result.get("bracket_take_profit_price")
 
     if returned_trail is None or returned_tp is None:
-        log(f"BRACKET NOT CONFIRMED on order {order_id} (trail={returned_trail}, tp={returned_tp}). "
+        log("BRACKET NOT CONFIRMED on order " + str(order_id) + " (trail=" + str(returned_trail) + ", tp=" + str(returned_tp) + "). Emergency closing to avoid a naked position.")
+        emergency_close_position(side, QUANTITY)
+        return False, True
+
+    log("BRACKET CONFIRMED on order " + str(order_id) + " -> Trailing SL=" + str(returned_trail) + ", TP=" + str(returned_tp))
+
+    fill_price = get_average_fill_price(order_id)
+    if fill_price:
+        log("ENTRY " + side.upper() + " FILLED @ " + str(fill_price) + " | Trailing SL=" + str(returned_trail) + " pts | TP=" + str(returned_tp))
+    else:
+        log("ENTRY " + side.upper() + " placed (fill price not confirmed via API yet) | Trailing SL=" + str(returned_trail) + " pts | TP=" + str(returned_tp))
+
+    return True, False
+
+
+def check_breakout(price):
+    now = time.time()
+    with state_lock:
+        if now < shared_state["cooldown_until"]:
+            return
+        if shared_state["position_open"]:
+            return
+        ref = shared_state["reference_candle"]
+        if ref is None:
+            return
+
+        side = None
+        if price > ref["high"]:
+            side = "buy"
+        elif price < ref["low"]:
+            side = "sell"
+
+        if side is None:
+            return
+
+        shared_state["position_open"] = True
+        shared_state["position_side"] = side
+        shared_state["reference_candle"] = None
+
+    entered, bracket_failed = execute_breakout_trade(side, price)
+
+    with state_lock:
+        if not entered:
+            shared_state["position_open"] = False
+            shared_state["position_side"] = None
+            if bracket_failed:
+                candle_seconds = get_candle_seconds(CANDLE_RESOLUTION)
+                shared_state["cooldown_until"] = time.time() + (candle_seconds * COOLDOWN_CANDLES)
+                log("Cooldown activated for " + str(COOLDOWN_CANDLES) + " candle(s) due to bracket failure.")
+
+
+def on_ws_open(ws):
+    log("WebSocket connected. Subscribing to mark_price channel...")
+    payload = {"type": "subscribe", "payload": {"channels": [{"name": "mark_price", "symbols": ["MARK:" + SYMBOL]}]}}
+    ws.send(json.dumps(payload))
+
+
+def on_ws_message(ws, message):
+    try:
+        data = json.loads(message)
+        msg_type = data.get("type")
+
+        if msg_type == "mark_price":
+            raw_price = data.get("p")
+            if raw_price is None:
+                log("WS mark_price message received with null price. Raw: " + str(data))
+                return
+            try:
+                price = float(raw_price)
+            except (TypeError, ValueError):
+                log("WS mark_price had non-numeric price value: " + repr(raw_price) + ". Raw: " + str(data))
+                return
+            with state_lock:
+                shared_state["latest_price"] = price
+            check_breakout(price)
+        else:
+            log("WS non-price message: " + str(data))
+    except Exception as e:
+        log("WS message parse error: " + str(e) + " | Raw message: " + str(message))
+
+
+def on_ws_error(ws, error):
+    log("WebSocket error: " + str(error))
+
+
+def on_ws_close(ws, close_status_code, close_msg):
+    log("WebSocket closed (code=" + str(close_status_code) + ", msg=" + str(close_msg) + "). Will reconnect...")
+
+
+def start_price_websocket():
+    while True:
+        try:
+            ws = websocket.WebSocketApp(WS_URL, on_open=on_ws_open, on_message=on_ws_message, on_error=on_ws_error, on_close=on_ws_close)
+            ws.run_forever(ping_interval=30, ping_timeout=10)
+        except Exception as e:
+            log("WebSocket thread exception: " + str(e))
+        log("Reconnecting WebSocket in " + str(WS_RECONNECT_DELAY) + " seconds...")
+        time.sleep(WS_RECONNECT_DELAY)
+
+
+def candle_watcher_loop():
+    candle_seconds = get_candle_seconds(CANDLE_RESOLUTION)
+    with state_lock:
+        shared_state["next_close_time"] = get_next_candle_close_time(CANDLE_RESOLUTION)
+
+    log("Candle watcher started. Waiting for current running " + CANDLE_RESOLUTION + " candle to close before marking any reference (per startup rule).")
+
+    while True:
+        try:
+            now = time.time()
+            with state_lock:
+                next_close_time = shared_state["next_close_time"]
+                pending_start = shared_state["pending_candle_start"]
+                pending_deadline = shared_state["pending_deadline"]
+
+            if now >= next_close_time and pending_start is None:
+                with state_lock:
+                    shared_state["pending_candle_start"] = shared_state["next_close_time"] - candle_seconds
+                    shared_state["pending_deadline"] = now + CANDLE_FETCH_RETRY_WINDOW
+                    shared_state["next_close_time"] += candle_seconds
+                    pending_start = shared_state["pending_candle_start"]
+                    pending_deadline = shared_state["pending_deadline"]
+
+            if pending_start is not None:
+                candle = fetch_candle_by_start_time(CANDLE_RESOLUTION, pending_start)
+                if candle:
+                    ref = evaluate_candle_data(candle)
+                    with state_lock:
+                        shared_state["reference_candle"] = ref
+                        shared_state["pending_candle_start"] = None
+                        shared_state["pending_deadline"] = None
+                elif now > pending_deadline:
+                    log("Candle fetch FAILED after " + str(CANDLE_FETCH_RETRY_WINDOW) + "s of retries. Skipping this candle.")
+                    with state_lock:
+                        shared_state["pending_candle_start"] = None
+                        shared_state["pending_deadline"] = None
+
+            time.sleep(CANDLE_WATCHER_TICK)
+        except Exception as e:
+            log("Candle watcher error: " + str(e))
+            time.sleep(CANDLE_WATCHER_TICK)
+
+
+def position_watcher_loop():
+    while True:
+        try:
+            with state_lock:
+                locally_open = shared_state["position_open"]
+
+            size, entry_price = get_position_size_and_entry()
+
+            if size is None:
+                time.sleep(POSITION_WATCHER_INTERVAL)
+                continue
+
+            if size != 0 and not locally_open:
+                with state_lock:
+                    shared_state["position_open"] = True
+                    shared_state["position_side"] = "buy" if size > 0 else "sell"
+                log("Position detected on resume/sync -> size=" + str(size) + ", entry_price=" + str(entry_price))
+
+            elif size == 0 and locally_open:
+                with state_lock:
+                    shared_state["position_open"] = False
+                    shared_state["position_side"] = None
+                log("Position CLOSED (flat). Ready for next qualifying breakout.")
+
+            time.sleep(POSITION_WATCHER_INTERVAL)
+        except Exception as e:
+            log("Position watcher error: " + str(e))
+            time.sleep(POSITION_WATCHER_INTERVAL)
+
+
+from flask import Flask
+app = Flask(__name__)
+
+
+@app.route("/ping")
+def ping():
+    return {"status": "alive", "time": get_ist_time()}, 200
+
+
+if __name__ == "__main__":
+    threading.Thread(target=start_price_websocket, daemon=True).start()
+    threading.Thread(target=candle_watcher_loop, daemon=True).start()
+    threading.Thread(target=position_watcher_loop, daemon=True).start()
+
+    log("Bot started. Symbol=" + SYMBOL + ", Resolution=" + CANDLE_RESOLUTION + ", Range<= " + str(CANDLE_RANGE_MAX_POINTS) + "pts, SL(trail)=" + str(SL_TRAIL_POINTS) + "pts, RR=1:" + str(RR_RATIO) + ", Qty=" + str(QUANTITY) + " lot(s)")
+
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
