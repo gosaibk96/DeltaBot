@@ -38,6 +38,7 @@ POSITION_WATCHER_INTERVAL = 2
 CANDLE_FETCH_RETRY_WINDOW = 20
 COOLDOWN_CANDLES = 3
 WS_RECONNECT_DELAY = 3
+PRICE_LOG_INTERVAL = 5
 
 ist = pytz.timezone('Asia/Kolkata')
 
@@ -52,6 +53,7 @@ shared_state = {
     "pending_candle_start": None,
     "pending_deadline": None,
     "next_close_time": None,
+    "last_price_log_time": 0,
 }
 
 
@@ -150,6 +152,42 @@ def get_order_by_id(order_id):
         return None
 
 
+def get_exit_reason():
+    """
+    Queries order history for the most recently closed stop order (SL or TP)
+    on this product to determine why the position was closed.
+    """
+    method = "GET"
+    path = "/v2/orders/history"
+    query_string = "?product_ids=" + str(PRODUCT_ID) + "&order_types=all_stop&page_size=5"
+    url = BASE_URL + path
+    headers = get_headers(method, path, query_string)
+    try:
+        resp = requests.get(
+            url,
+            params={"product_ids": str(PRODUCT_ID), "order_types": "all_stop", "page_size": 5},
+            headers=headers,
+            timeout=(3, 10),
+        )
+        data = resp.json()
+        if data.get("success"):
+            orders = data.get("result", [])
+            closed_orders = [o for o in orders if o.get("state") == "closed"]
+            if closed_orders:
+                closed_orders.sort(key=lambda o: int(o.get("created_at", 0)), reverse=True)
+                latest = closed_orders[0]
+                stop_type = latest.get("stop_order_type")
+                fill_price = latest.get("average_fill_price")
+                if stop_type == "stop_loss_order":
+                    return "TRAILING SL HIT", fill_price
+                elif stop_type == "take_profit_order":
+                    return "TAKE PROFIT HIT", fill_price
+        return "UNKNOWN (manual close / liquidation / no stop record found)", None
+    except Exception as e:
+        log("Error fetching exit reason: " + str(e))
+        return "UNKNOWN (error fetching exit reason)", None
+
+
 def place_entry_order_with_trailing_bracket(side, size, trail_amount_str, tp_price_str):
     method = "POST"
     path = "/v2/orders"
@@ -217,10 +255,16 @@ def evaluate_candle_data(candle):
     low = float(candle["low"])
     range_points = round(high - low, 8)
     qualifies = CANDLE_RANGE_MIN_POINTS <= range_points <= CANDLE_RANGE_MAX_POINTS
-    log("Closed Candle -> High: " + str(high) + ", Low: " + str(low) + ", Range: " + str(range_points) + " pts, Required: <= " + str(CANDLE_RANGE_MAX_POINTS) + " pts, Qualifies: " + str(qualifies))
+
+    with state_lock:
+        current_price = shared_state["latest_price"]
+
     if qualifies:
+        log("CONDITION MATCH -> Candle Range=" + str(range_points) + " pts is within limit (<=" + str(CANDLE_RANGE_MAX_POINTS) + " pts). Reference SET -> High=" + str(high) + ", Low=" + str(low) + " | Current BTC Price=" + str(current_price))
         return {"high": high, "low": low}
-    return None
+    else:
+        log("CONDITION NOT MATCH -> Candle Range=" + str(range_points) + " pts exceeds limit (<=" + str(CANDLE_RANGE_MAX_POINTS) + " pts). No reference set. | Current BTC Price=" + str(current_price))
+        return None
 
 
 def execute_breakout_trade(side, trigger_price):
@@ -255,9 +299,9 @@ def execute_breakout_trade(side, trigger_price):
 
     fill_price = get_average_fill_price(order_id)
     if fill_price:
-        log("ENTRY " + side.upper() + " FILLED @ " + str(fill_price) + " | Trailing SL=" + str(returned_trail) + " pts | TP=" + str(returned_tp))
+        log("POSITION OPENED -> " + side.upper() + " @ " + str(fill_price) + " | Trailing SL=" + str(returned_trail) + " pts | TP=" + str(returned_tp))
     else:
-        log("ENTRY " + side.upper() + " placed (fill price not confirmed via API yet) | Trailing SL=" + str(returned_trail) + " pts | TP=" + str(returned_tp))
+        log("POSITION OPENED -> " + side.upper() + " (fill price not confirmed via API yet) | Trailing SL=" + str(returned_trail) + " pts | TP=" + str(returned_tp))
 
     return True, False
 
@@ -298,6 +342,26 @@ def check_breakout(price):
                 log("Cooldown activated for " + str(COOLDOWN_CANDLES) + " candle(s) due to bracket failure.")
 
 
+def maybe_log_price(price):
+    now = time.time()
+    should_log = False
+    with state_lock:
+        if now - shared_state["last_price_log_time"] >= PRICE_LOG_INTERVAL:
+            shared_state["last_price_log_time"] = now
+            should_log = True
+            position_open = shared_state["position_open"]
+            position_side = shared_state["position_side"]
+            ref = shared_state["reference_candle"]
+
+    if should_log:
+        if position_open:
+            log("LIVE BTC PRICE=" + str(price) + " | Status: IN POSITION (" + str(position_side).upper() + ")")
+        elif ref is not None:
+            log("LIVE BTC PRICE=" + str(price) + " | Status: WAITING FOR BREAKOUT | Reference High=" + str(ref["high"]) + ", Low=" + str(ref["low"]))
+        else:
+            log("LIVE BTC PRICE=" + str(price) + " | Status: WAITING FOR QUALIFYING CANDLE (no active reference)")
+
+
 def on_ws_open(ws):
     log("WebSocket connected. Subscribing to mark_price channel...")
     payload = {"type": "subscribe", "payload": {"channels": [{"name": "mark_price", "symbols": ["MARK:" + SYMBOL]}]}}
@@ -312,18 +376,15 @@ def on_ws_message(ws, message):
         if msg_type == "mark_price":
             raw_price = data.get("price")
             if raw_price is None:
-                log("WS mark_price message received with null price. Raw: " + str(data))
                 return
             try:
                 price = float(raw_price)
             except (TypeError, ValueError):
-                log("WS mark_price had non-numeric price value: " + repr(raw_price) + ". Raw: " + str(data))
                 return
             with state_lock:
                 shared_state["latest_price"] = price
+            maybe_log_price(price)
             check_breakout(price)
-        else:
-            log("WS non-price message: " + str(data))
     except Exception as e:
         log("WS message parse error: " + str(e) + " | Raw message: " + str(message))
 
@@ -412,7 +473,12 @@ def position_watcher_loop():
                 with state_lock:
                     shared_state["position_open"] = False
                     shared_state["position_side"] = None
-                log("Position CLOSED (flat). Ready for next qualifying breakout.")
+                reason, exit_price = get_exit_reason()
+                if exit_price:
+                    log("POSITION CLOSED -> Reason: " + reason + " | Exit Price=" + str(exit_price))
+                else:
+                    log("POSITION CLOSED -> Reason: " + reason)
+                log("Ready for next qualifying breakout.")
 
             time.sleep(POSITION_WATCHER_INTERVAL)
         except Exception as e:
@@ -427,6 +493,11 @@ app = Flask(__name__)
 @app.route("/ping")
 def ping():
     return {"status": "alive", "time": get_ist_time()}, 200
+
+
+@app.route("/")
+def home():
+    return {"status": "bot running", "symbol": SYMBOL}, 200
 
 
 if __name__ == "__main__":
