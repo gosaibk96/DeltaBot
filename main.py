@@ -32,24 +32,24 @@ WS_RECONNECT_DELAY = 3
 PRICE_LOG_INTERVAL = 5
 
 SYMBOLS_CONFIG = [
-    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "15m", "quantity": 1, "range_points": 200,    "tsl_points": 200},
-    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 1, "range_points": 8,      "tsl_points": 8},
-    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "15m", "quantity": 10, "range_points": 8,      "tsl_points": 8},
-    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "15m", "quantity": 5, "range_points": 0.20,      "tsl_points": 0.20},
-    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 1, "range_points": 0.0065, "tsl_points": 0.0065},
-    {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0150, "tsl_points": 0.0150},
-    {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
-    {"symbol": "EVAAUSD",    "product_id": 98745,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
-    {"symbol": "COAIUSD",    "product_id": 98572,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0015, "tsl_points": 0.0015},
-    {"symbol": "ASTERUSD",   "product_id": 96160,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
-    {"symbol": "MUSD",       "product_id": 84925,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0060, "tsl_points": 0.0060},
-    {"symbol": "VIRTUALUSD", "product_id": 54903,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0030, "tsl_points": 0.0030},
-    {"symbol": "ZROUSD",     "product_id": 26457,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0055, "tsl_points": 0.0055},
-    {"symbol": "RUNEUSD",    "product_id": 21522,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
-    {"symbol": "APTUSD",     "product_id": 20196,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0030, "tsl_points": 0.0030},
-    {"symbol": "FILUSD",     "product_id": 19617,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0040, "tsl_points": 0.0040},
-    {"symbol": "LDOUSD",     "product_id": 19616,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0020, "tsl_points": 0.0020},
-    {"symbol": "ONDOUSD",    "product_id": 19300,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0020, "tsl_points": 0.0020},
+    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "1h", "quantity": 1, "range_points": 200,    "tsl_points": 200},
+    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "1h", "quantity": 1, "range_points": 8,      "tsl_points": 8},
+    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "1h", "quantity": 10, "range_points": 8,      "tsl_points": 8},
+    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "1h", "quantity": 5, "range_points": 0.20,      "tsl_points": 0.20},
+    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0065, "tsl_points": 0.0065},
+    {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0150, "tsl_points": 0.0150},
+    {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
+    {"symbol": "EVAAUSD",    "product_id": 98745,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
+    {"symbol": "COAIUSD",    "product_id": 98572,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0015, "tsl_points": 0.0015},
+    {"symbol": "ASTERUSD",   "product_id": 96160,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
+    {"symbol": "MUSD",       "product_id": 84925,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0060, "tsl_points": 0.0060},
+    {"symbol": "VIRTUALUSD", "product_id": 54903,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0030, "tsl_points": 0.0030},
+    {"symbol": "ZROUSD",     "product_id": 26457,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0055, "tsl_points": 0.0055},
+    {"symbol": "RUNEUSD",    "product_id": 21522,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
+    {"symbol": "APTUSD",     "product_id": 20196,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0030, "tsl_points": 0.0030},
+    {"symbol": "FILUSD",     "product_id": 19617,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0040, "tsl_points": 0.0040},
+    {"symbol": "LDOUSD",     "product_id": 19616,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0020, "tsl_points": 0.0020},
+    {"symbol": "ONDOUSD",    "product_id": 19300,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0020, "tsl_points": 0.0020},
 ]
 
 symbol_lookup = {cfg["symbol"]: cfg for cfg in SYMBOLS_CONFIG}
@@ -66,6 +66,7 @@ for cfg in SYMBOLS_CONFIG:
         "position_open": False,
         "position_side": None,
         "entry_price": None,
+        "entry_time": None,
         "cooldown_until": 0,
         "last_price_log_time": 0,
         "next_close_time": None,
@@ -177,9 +178,9 @@ def get_exit_reason_and_details(product_id):
                 stop_type = latest.get("stop_order_type")
                 fill_price = latest.get("average_fill_price")
                 if stop_type == "stop_loss_order":
-                    return "🛡️ TSL HIT (Trailing SL)", fill_price
+                    return "🛡️ TSL HIT", fill_price
                 elif stop_type == "take_profit_order":
-                    return "🎯 TP HIT (Take Profit)", fill_price
+                    return "🎯 TP HIT", fill_price
         return "⚡ CLOSED", None
     except Exception as e:
         return "⚡ CLOSED", None
@@ -249,10 +250,10 @@ def evaluate_candle_data(cfg, candle):
         current_price = state[symbol]["latest_price"]
 
     if qualifies:
-        log(symbol, "✅ MATCH -> Candle Range=" + str(range_points) + " pts (<= " + str(max_range) + "). High=" + str(high) + ", Low=" + str(low) + " | Current Price=" + str(current_price))
+        log(symbol, "✅ MATCH -> Range=" + str(range_points) + " pts. High=" + str(high) + ", Low=" + str(low) + " | Price=" + str(current_price))
         return {"high": high, "low": low}
     else:
-        log(symbol, "⚠️ RANGE EXCEEDED -> Range=" + str(range_points) + " pts (Limit: " + str(max_range) + "). High=" + str(high) + ", Low=" + str(low))
+        log(symbol, "⚠️ RANGE EXCEEDED -> Range=" + str(range_points) + " pts (Limit: " + str(max_range) + ")")
     return None
 
 def execute_breakout_trade(cfg, side, trigger_price):
@@ -275,7 +276,7 @@ def execute_breakout_trade(cfg, side, trigger_price):
 
     order_resp = place_entry_order_with_trailing_bracket(product_id, symbol, side, quantity, trail_amount_str, tp_price_str)
     if not order_resp or not order_resp.get("success"):
-        log(symbol, "❌ ENTRY FAILED -> Order placement error")
+        log(symbol, "❌ ENTRY FAILED")
         return False, False, None
 
     result = order_resp.get("result", {})
@@ -284,14 +285,13 @@ def execute_breakout_trade(cfg, side, trigger_price):
     returned_tp = result.get("bracket_take_profit_price")
 
     if returned_trail is None or returned_tp is None:
-        log(symbol, "❌ BRACKET ERROR -> Emergency closing position")
         emergency_close_position(product_id, symbol, side, quantity)
         return False, True, None
 
     fill_price = get_average_fill_price(order_id)
     actual_entry = fill_price if fill_price else trigger_price
     side_icon = "🟢 [BUY]" if side == "buy" else "🔴 [SELL]"
-    log(symbol, "🚀 ENTRY SUCCESS " + side_icon + " -> Executed @ " + str(actual_entry) + " | TP: " + str(tp_price_str) + " | TSL Trail: " + str(trail_amount_str))
+    log(symbol, "🚀 ENTRY SUCCESS " + side_icon + " @ " + str(actual_entry))
     return True, False, actual_entry
 
 def check_breakout(cfg, price):
@@ -311,10 +311,11 @@ def check_breakout(cfg, price):
 
         s["position_open"] = True
         s["position_side"] = side
+        s["entry_time"] = get_ist_time()
         s["reference_candle"] = None
 
     side_label = "BUY" if side == "buy" else "SELL"
-    log(symbol, "⚡ BREAKOUT DETECTED (" + side_label + ") -> Trigger Price: " + str(price) + " breached High/Low")
+    log(symbol, "⚡ BREAKOUT (" + side_label + ") @ " + str(price))
     entered, bracket_failed, entry_price = execute_breakout_trade(cfg, side, price)
 
     with state_lock:
@@ -322,6 +323,7 @@ def check_breakout(cfg, price):
         if not entered:
             s["position_open"] = False
             s["position_side"] = None
+            s["entry_time"] = None
             if bracket_failed:
                 s["cooldown_until"] = time.time() + (get_candle_seconds(cfg["resolution"]) * COOLDOWN_CANDLES)
         else:
@@ -341,8 +343,8 @@ def maybe_log_price(cfg, price):
                 if s["reference_candle"] is not None:
                     status_str = "⏳ WAITING FOR BREAKOUT"
                 else:
-                    status_str = "🔄 WFC (Waiting For Close / Running)"
-            log(symbol, "LIVE PRICE=" + str(price) + " | Status: " + status_str)
+                    status_str = "🔄 WFC (WAITING FOR CLOSE / RUNNING)"
+            log(symbol, "PRICE=" + str(price) + " | Status: " + status_str)
 
 def on_ws_open(ws):
     mark_symbols = ["MARK:" + cfg["symbol"] for cfg in SYMBOLS_CONFIG]
@@ -438,6 +440,7 @@ def position_watcher_loop():
                     locally_open = state[symbol]["position_open"]
                     side = state[symbol]["position_side"]
                     entry = state[symbol]["entry_price"]
+                    ent_time = state[symbol]["entry_time"]
 
                 size, api_entry = get_position_size_and_entry(product_id)
                 if size is None:
@@ -448,6 +451,8 @@ def position_watcher_loop():
                         state[symbol]["position_open"] = True
                         state[symbol]["position_side"] = "buy" if size > 0 else "sell"
                         state[symbol]["entry_price"] = api_entry
+                        if not state[symbol]["entry_time"]:
+                            state[symbol]["entry_time"] = get_ist_time()
                 elif size == 0 and locally_open:
                     exit_reason, exit_price = get_exit_reason_and_details(product_id)
                     exit_val = exit_price if exit_price else (state[symbol]["latest_price"] or 0)
@@ -460,6 +465,7 @@ def position_watcher_loop():
                             pnl = (entry - exit_val) * quantity
 
                     is_win = pnl > 0
+                    exit_time_str = get_ist_time()
 
                     with state_lock:
                         state[symbol]["position_open"] = False
@@ -473,15 +479,17 @@ def position_watcher_loop():
                         state[symbol]["net_pnl"] += pnl
 
                         trade_logs.insert(0, {
-                            "time": get_ist_time(),
+                            "entry_time": ent_time if ent_time else exit_time_str,
+                            "exit_time": exit_time_str,
                             "coin": symbol,
-                            "type": str(side).upper() if side else "TRADE",
+                            "type": (str(side).upper() if side else "TRADE") + " | " + exit_reason,
                             "entry": round(entry, 4) if entry else 0,
                             "exit": round(exit_val, 4),
                             "pnl": round(pnl, 2)
                         })
                         if len(trade_logs) > 50:
                             trade_logs.pop()
+                        state[symbol]["entry_time"] = None
 
                     log(symbol, "🏁 EXIT -> " + exit_reason + " | Exit Price: " + str(round(exit_val, 4)) + " | Net PnL: " + str(round(pnl, 2)))
 
@@ -497,11 +505,16 @@ DASHBOARD_HTML = """
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Supertrend Multi-Coin Dashboard</title>
+    <title>Multi-Coin Dashboard</title>
     <meta http-equiv="refresh" content="5">
     <style>
         body { background-color: #0d1117; color: #c9d1d9; font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-        h1 { text-align: center; color: #58a6ff; margin-bottom: 30px; }
+        h1 { text-align: center; color: #58a6ff; margin-bottom: 10px; }
+        .top-summary { text-align: center; background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 30px; }
+        .top-summary h2 { margin: 0; color: #8b949e; font-size: 16px; }
+        .total-pnl { font-size: 32px; font-weight: bold; margin: 5px 0; }
+        .total-trades { font-size: 14px; color: #8b949e; }
+        
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; margin-bottom: 40px; }
         .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .card h3 { margin: 0 0 10px 0; color: #f0f6fc; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
@@ -510,14 +523,26 @@ DASHBOARD_HTML = """
         .pnl-neg { color: #f85149; font-weight: bold; }
         
         .table-container { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; overflow-x: auto; }
-        h2 { color: #f0f6fc; margin-top: 0; text-align: center; }
+        h2.section-title { color: #f0f6fc; margin-top: 0; text-align: center; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; }
         th, td { padding: 12px; border-bottom: 1px solid #30363d; font-size: 14px; }
         th { color: #8b949e; background-color: #21262d; }
     </style>
 </head>
 <body>
-    <h1>📊 Supertrend Multi-Coin Dashboard</h1>
+    <h1>Multi-Coin Dashboard</h1>
+    
+    {% set ns = namespace(total_pnl=0.0, total_trades=0) %}
+    {% for symbol, data in states.items() %}
+        {% set ns.total_pnl = ns.total_pnl + data.net_pnl %}
+        {% set ns.total_trades = ns.total_trades + data.total_trades %}
+    {% endfor %}
+
+    <div class="top-summary">
+        <h2>Total Portfolio Net P&L</h2>
+        <div class="total-pnl {% if ns.total_pnl >= 0 %}pnl-pos{% else %}pnl-neg{% endif %}">${{ "%.2f"|format(ns.total_pnl) }}</div>
+        <div class="total-trades">Total Trades Executed: {{ ns.total_trades }}</div>
+    </div>
     
     <div class="grid">
         {% for symbol, data in states.items() %}
@@ -531,13 +556,14 @@ DASHBOARD_HTML = """
     </div>
 
     <div class="table-container">
-        <h2>📜 Live Executed Trade Logs</h2>
+        <h2 class="section-title">📜 Live Executed Trade Logs</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Time</th>
+                    <th>Entry Time</th>
+                    <th>Exit Time</th>
                     <th>Coin</th>
-                    <th>Type</th>
+                    <th>Type / Hit</th>
                     <th>Entry</th>
                     <th>Exit</th>
                     <th>P&L</th>
@@ -547,7 +573,8 @@ DASHBOARD_HTML = """
                 {% if logs %}
                     {% for log in logs %}
                     <tr>
-                        <td>{{ log.time }}</td>
+                        <td>{{ log.entry_time }}</td>
+                        <td>{{ log.exit_time }}</td>
                         <td>{{ log.coin }}</td>
                         <td>{{ log.type }}</td>
                         <td>{{ log.entry }}</td>
@@ -556,7 +583,7 @@ DASHBOARD_HTML = """
                     </tr>
                     {% endfor %}
                 {% else %}
-                    <tr><td colspan="6" style="text-align: center; color: #8b949e;">No trades executed yet.</td></tr>
+                    <tr><td colspan="7" style="text-align: center; color: #8b949e;">No trades executed yet.</td></tr>
                 {% endif %}
             </tbody>
         </table>
