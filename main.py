@@ -39,11 +39,11 @@ PRICE_LOG_INTERVAL = 5
 # tsl_points    = trailing stop-loss distance (TP = RR_RATIO x tsl_points)
 # ============================================================
 SYMBOLS_CONFIG = [
-    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "1h", "quantity": 1, "range_points": 200,    "tsl_points": 200},
-    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "1h", "quantity": 1, "range_points": 5,      "tsl_points": 5},
-    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "1h", "quantity": 1, "range_points": 5,      "tsl_points": 5},
-    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "1h", "quantity": 1, "range_points": 5,      "tsl_points": 5},
-    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0065, "tsl_points": 0.0065},
+    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "15m", "quantity": 1, "range_points": 200,    "tsl_points": 200},
+    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 1, "range_points": 8,      "tsl_points": 8},
+    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "15m", "quantity": 10, "range_points": 8,      "tsl_points": 8},
+    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "15m", "quantity": 5, "range_points": 0.20,      "tsl_points": 0.20},
+    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 1, "range_points": 0.0065, "tsl_points": 0.0065},
     {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0150, "tsl_points": 0.0150},
     {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
     {"symbol": "EVAAUSD",    "product_id": 98745,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
