@@ -33,7 +33,7 @@ PRICE_LOG_INTERVAL = 5
 
 SYMBOLS_CONFIG = [
     {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "15m", "quantity": 1, "range_points": 200,    "tsl_points": 200},
-    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 1, "range_points": 8,      "tsl_points": 8},
+    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "5m", "quantity": 1, "range_points": 8,      "tsl_points": 8},
     {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "15m", "quantity": 10, "range_points": 8,      "tsl_points": 8},
     {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "15m", "quantity": 5, "range_points": 0.20,      "tsl_points": 0.20},
     {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 1, "range_points": 0.0065, "tsl_points": 0.0065},
@@ -170,7 +170,7 @@ def get_exit_reason_and_details(product_id):
         data = resp.json()
         if data.get("success"):
             orders = data.get("result", [])
-            closed_orders = [o for o in orders if o.get("state"] == "closed"]
+            closed_orders = [o for o in orders if o.get("state") == "closed"]
             if closed_orders:
                 closed_orders.sort(key=lambda o: int(o.get("created_at", 0)), reverse=True)
                 latest = closed_orders[0]
