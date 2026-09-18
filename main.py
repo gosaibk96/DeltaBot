@@ -9,6 +9,7 @@ import websocket
 from decimal import Decimal
 from datetime import datetime
 import pytz
+from flask import Flask, render_template_string
 
 API_KEY = os.environ.get("API_KEY", "your_api_key_here")
 API_SECRET = os.environ.get("API_SECRET", "your_api_secret_here")
@@ -30,14 +31,6 @@ COOLDOWN_CANDLES = 3
 WS_RECONNECT_DELAY = 3
 PRICE_LOG_INTERVAL = 5
 
-# ============================================================
-# PER-SYMBOL CONFIG -> Har symbol ka resolution / quantity /
-# range_points / tsl_points / tick_size independently change kar sakte ho.
-# resolution    = timeframe jis par reference candle dekha jayega (e.g. "1h", "15m", "1d")
-# quantity      = lot size jo order place hote waqt use hoga
-# range_points  = max allowed candle (High-Low) range jisse reference set hoga
-# tsl_points    = trailing stop-loss distance (TP = RR_RATIO x tsl_points)
-# ============================================================
 SYMBOLS_CONFIG = [
     {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "15m", "quantity": 1, "range_points": 200,    "tsl_points": 200},
     {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 1, "range_points": 8,      "tsl_points": 8},
@@ -60,43 +53,43 @@ SYMBOLS_CONFIG = [
 ]
 
 symbol_lookup = {cfg["symbol"]: cfg for cfg in SYMBOLS_CONFIG}
-
 ist = pytz.timezone('Asia/Kolkata')
-
 state_lock = threading.Lock()
 
 state = {}
+trade_logs = []
+
 for cfg in SYMBOLS_CONFIG:
     state[cfg["symbol"]] = {
         "latest_price": None,
         "reference_candle": None,
         "position_open": False,
         "position_side": None,
+        "entry_price": None,
         "cooldown_until": 0,
         "last_price_log_time": 0,
         "next_close_time": None,
         "pending_candle_start": None,
         "pending_deadline": None,
+        "total_trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "net_pnl": 0.0
     }
-
 
 def get_ist_time():
     return datetime.now(ist).strftime('%Y-%m-%d %H:%M:%S')
 
-
 def log(symbol, msg):
     print("[" + get_ist_time() + "][" + symbol + "] " + str(msg), flush=True)
 
-
 def get_candle_seconds(resolution):
     return RESOLUTION_SECONDS.get(resolution, 3600)
-
 
 def round_to_tick(price, tick_size):
     if tick_size <= 0:
         return price
     return round(price / tick_size) * tick_size
-
 
 def format_price(value, tick_size):
     d = Decimal(str(tick_size))
@@ -104,12 +97,10 @@ def format_price(value, tick_size):
     decimals = -exponent if exponent < 0 else 0
     return "{:.{}f}".format(float(value), decimals)
 
-
 def generate_signature(secret, message):
     message = bytes(message, "utf-8")
     secret = bytes(secret, "utf-8")
     return hmac.new(secret, message, hashlib.sha256).hexdigest()
-
 
 def get_headers(method, path, query_string="", payload=""):
     timestamp = str(int(time.time()))
@@ -117,12 +108,10 @@ def get_headers(method, path, query_string="", payload=""):
     signature = generate_signature(API_SECRET, signature_data)
     return {"api-key": API_KEY, "timestamp": timestamp, "signature": signature, "User-Agent": "render-multisymbol-breakout-bot", "Content-Type": "application/json"}
 
-
 def get_next_candle_close_time(resolution):
     candle_seconds = get_candle_seconds(resolution)
     now = time.time()
     return (int(now) // candle_seconds + 1) * candle_seconds
-
 
 def fetch_candle_by_start_time(resolution, symbol, expected_start_time):
     candle_seconds = get_candle_seconds(resolution)
@@ -142,7 +131,6 @@ def fetch_candle_by_start_time(resolution, symbol, expected_start_time):
         log(symbol, "Error fetching candles: " + str(e))
         return None
 
-
 def get_position_size_and_entry(product_id):
     method = "GET"
     path = "/v2/positions"
@@ -158,9 +146,7 @@ def get_position_size_and_entry(product_id):
                 return int(result["size"]), result.get("entry_price")
         return 0, None
     except Exception as e:
-        print("[" + get_ist_time() + "] Error fetching position for product_id " + str(product_id) + ": " + str(e), flush=True)
-        return None, None
-
+        return 0, None
 
 def get_order_by_id(order_id):
     method = "GET"
@@ -171,27 +157,20 @@ def get_order_by_id(order_id):
         resp = requests.get(url, headers=headers, timeout=(3, 10))
         return resp.json()
     except Exception as e:
-        print("[" + get_ist_time() + "] Error fetching order: " + str(e), flush=True)
         return None
 
-
-def get_exit_reason(product_id):
+def get_exit_reason_and_details(product_id):
     method = "GET"
     path = "/v2/orders/history"
     query_string = "?product_ids=" + str(product_id) + "&order_types=all_stop&page_size=5"
     url = BASE_URL + path
     headers = get_headers(method, path, query_string)
     try:
-        resp = requests.get(
-            url,
-            params={"product_ids": str(product_id), "order_types": "all_stop", "page_size": 5},
-            headers=headers,
-            timeout=(3, 10),
-        )
+        resp = requests.get(url, params={"product_ids": str(product_id), "order_types": "all_stop", "page_size": 5}, headers=headers, timeout=(3, 10))
         data = resp.json()
         if data.get("success"):
             orders = data.get("result", [])
-            closed_orders = [o for o in orders if o.get("state") == "closed"]
+            closed_orders = [o for o in orders if o.get("state"] == "closed"]
             if closed_orders:
                 closed_orders.sort(key=lambda o: int(o.get("created_at", 0)), reverse=True)
                 latest = closed_orders[0]
@@ -201,10 +180,9 @@ def get_exit_reason(product_id):
                     return "TRAILING SL HIT", fill_price
                 elif stop_type == "take_profit_order":
                     return "TAKE PROFIT HIT", fill_price
-        return "UNKNOWN (manual close / liquidation / no stop record found)", None
+        return "CLOSED", None
     except Exception as e:
-        return "UNKNOWN (error fetching exit reason: " + str(e) + ")", None
-
+        return "CLOSED", None
 
 def place_entry_order_with_trailing_bracket(product_id, product_symbol, side, size, trail_amount_str, tp_price_str):
     method = "POST"
@@ -226,13 +204,10 @@ def place_entry_order_with_trailing_bracket(product_id, product_symbol, side, si
         resp = requests.post(url, data=payload, headers=headers, timeout=(3, 10))
         return resp.json()
     except Exception as e:
-        log(product_symbol, "Error placing entry order: " + str(e))
         return None
-
 
 def emergency_close_position(product_id, product_symbol, side, quantity):
     close_side = "sell" if side == "buy" else "buy"
-    log(product_symbol, "EMERGENCY CLOSE triggered -> closing naked position via reduce-only market " + close_side + " order")
     method = "POST"
     path = "/v2/orders"
     url = BASE_URL + path
@@ -248,14 +223,9 @@ def emergency_close_position(product_id, product_symbol, side, quantity):
     headers = get_headers(method, path, "", payload)
     try:
         resp = requests.post(url, data=payload, headers=headers, timeout=(3, 10))
-        result = resp.json()
-        if not result.get("success"):
-            log(product_symbol, "CRITICAL: Emergency close FAILED -> " + str(result) + ". Manual intervention required!")
-        return result
+        return resp.json()
     except Exception as e:
-        log(product_symbol, "CRITICAL: Emergency close request error: " + str(e) + ". Manual intervention required!")
         return None
-
 
 def get_average_fill_price(order_id, retries=8):
     fill_price = None
@@ -266,7 +236,6 @@ def get_average_fill_price(order_id, retries=8):
             fill_price = fresh.get("result", {}).get("average_fill_price")
         retries -= 1
     return float(fill_price) if fill_price else None
-
 
 def evaluate_candle_data(cfg, candle):
     symbol = cfg["symbol"]
@@ -280,12 +249,9 @@ def evaluate_candle_data(cfg, candle):
         current_price = state[symbol]["latest_price"]
 
     if qualifies:
-        log(symbol, "CONDITION MATCH -> Candle Range=" + str(range_points) + " pts is within limit (<=" + str(max_range) + " pts). Reference SET -> High=" + str(high) + ", Low=" + str(low) + " | Current Price=" + str(current_price))
+        log(symbol, "CONDITION MATCH -> Range=" + str(range_points) + " pts. Reference SET -> High=" + str(high) + ", Low=" + str(low))
         return {"high": high, "low": low}
-    else:
-        log(symbol, "CONDITION NOT MATCH -> Candle Range=" + str(range_points) + " pts exceeds limit (<=" + str(max_range) + " pts). No reference set. | Current Price=" + str(current_price))
-        return None
-
+    return None
 
 def execute_breakout_trade(cfg, side, trigger_price):
     symbol = cfg["symbol"]
@@ -305,54 +271,36 @@ def execute_breakout_trade(cfg, side, trigger_price):
     tp_price_str = format_price(tp_price, tick_size)
     trail_amount_str = format_price(raw_trail, tick_size)
 
-    log(symbol, "BREAKOUT DETECTED -> Placing " + side.upper() + " market order | qty=" + str(quantity) + " lot(s) | Trailing SL=" + trail_amount_str + " pts | TP=" + tp_price_str)
-
     order_resp = place_entry_order_with_trailing_bracket(product_id, symbol, side, quantity, trail_amount_str, tp_price_str)
     if not order_resp or not order_resp.get("success"):
-        log(symbol, "ORDER FAILED -> " + str(order_resp))
-        return False, False
+        return False, False, None
 
     result = order_resp.get("result", {})
     order_id = result.get("id")
-
     returned_trail = result.get("bracket_trail_amount")
     returned_tp = result.get("bracket_take_profit_price")
 
     if returned_trail is None or returned_tp is None:
-        log(symbol, "BRACKET NOT CONFIRMED on order " + str(order_id) + " (trail=" + str(returned_trail) + ", tp=" + str(returned_tp) + "). Emergency closing to avoid a naked position.")
         emergency_close_position(product_id, symbol, side, quantity)
-        return False, True
-
-    log(symbol, "BRACKET CONFIRMED on order " + str(order_id) + " -> Trailing SL=" + str(returned_trail) + ", TP=" + str(returned_tp))
+        return False, True, None
 
     fill_price = get_average_fill_price(order_id)
-    if fill_price:
-        log(symbol, "POSITION OPENED -> " + side.upper() + " @ " + str(fill_price) + " | Trailing SL=" + str(returned_trail) + " pts | TP=" + str(returned_tp))
-    else:
-        log(symbol, "POSITION OPENED -> " + side.upper() + " (fill price not confirmed via API yet) | Trailing SL=" + str(returned_trail) + " pts | TP=" + str(returned_tp))
-
-    return True, False
-
+    actual_entry = fill_price if fill_price else trigger_price
+    log(symbol, "POSITION OPENED -> " + side.upper() + " @ " + str(actual_entry))
+    return True, False, actual_entry
 
 def check_breakout(cfg, price):
     symbol = cfg["symbol"]
     now = time.time()
     with state_lock:
         s = state[symbol]
-        if now < s["cooldown_until"]:
-            return
-        if s["position_open"]:
+        if now < s["cooldown_until"] or s["position_open"]:
             return
         ref = s["reference_candle"]
         if ref is None:
             return
 
-        side = None
-        if price > ref["high"]:
-            side = "buy"
-        elif price < ref["low"]:
-            side = "sell"
-
+        side = "buy" if price > ref["high"] else ("sell" if price < ref["low"] else None)
         if side is None:
             return
 
@@ -360,7 +308,7 @@ def check_breakout(cfg, price):
         s["position_side"] = side
         s["reference_candle"] = None
 
-    entered, bracket_failed = execute_breakout_trade(cfg, side, price)
+    entered, bracket_failed, entry_price = execute_breakout_trade(cfg, side, price)
 
     with state_lock:
         s = state[symbol]
@@ -368,116 +316,71 @@ def check_breakout(cfg, price):
             s["position_open"] = False
             s["position_side"] = None
             if bracket_failed:
-                candle_seconds = get_candle_seconds(cfg["resolution"])
-                s["cooldown_until"] = time.time() + (candle_seconds * COOLDOWN_CANDLES)
-                log(symbol, "Cooldown activated for " + str(COOLDOWN_CANDLES) + " candle(s) due to bracket failure.")
-
+                s["cooldown_until"] = time.time() + (get_candle_seconds(cfg["resolution"]) * COOLDOWN_CANDLES)
+        else:
+            s["entry_price"] = entry_price
 
 def maybe_log_price(cfg, price):
     symbol = cfg["symbol"]
     now = time.time()
-    should_log = False
-    position_open = False
-    position_side = None
-    ref = None
     with state_lock:
         s = state[symbol]
         if now - s["last_price_log_time"] >= PRICE_LOG_INTERVAL:
             s["last_price_log_time"] = now
-            should_log = True
-            position_open = s["position_open"]
-            position_side = s["position_side"]
-            ref = s["reference_candle"]
-
-    if should_log:
-        if position_open:
-            log(symbol, "LIVE PRICE=" + str(price) + " | Status: IN POSITION (" + str(position_side).upper() + ")")
-        elif ref is not None:
-            log(symbol, "LIVE PRICE=" + str(price) + " | Status: WAITING FOR BREAKOUT | Reference High=" + str(ref["high"]) + ", Low=" + str(ref["low"]))
-        else:
-            log(symbol, "LIVE PRICE=" + str(price) + " | Status: WAITING FOR QUALIFYING CANDLE (no active reference)")
-
+            log(symbol, "LIVE PRICE=" + str(price))
 
 def on_ws_open(ws):
-    print("[" + get_ist_time() + "] WebSocket connected. Subscribing to mark_price channel for all symbols...", flush=True)
     mark_symbols = ["MARK:" + cfg["symbol"] for cfg in SYMBOLS_CONFIG]
     payload = {"type": "subscribe", "payload": {"channels": [{"name": "mark_price", "symbols": mark_symbols}]}}
     ws.send(json.dumps(payload))
 
-
 def on_ws_message(ws, message):
     try:
         data = json.loads(message)
-        msg_type = data.get("type")
-        if msg_type != "mark_price":
+        if data.get("type") != "mark_price":
             return
-
-        raw_symbol = data.get("symbol")
-        if raw_symbol is None:
-            raw_symbol = data.get("sy")
-
-        raw_price = data.get("price")
-        if raw_price is None:
-            raw_price = data.get("p")
-
-        if raw_symbol is None or raw_price is None:
+        raw_symbol = data.get("symbol") or data.get("sy")
+        raw_price = data.get("price") or data.get("p")
+        if not raw_symbol or not raw_price:
             return
-
         symbol = raw_symbol.replace("MARK:", "")
         cfg = symbol_lookup.get(symbol)
-        if cfg is None:
+        if not cfg:
             return
-
-        try:
-            price = float(raw_price)
-        except (TypeError, ValueError):
-            return
-
+        price = float(raw_price)
         with state_lock:
             state[symbol]["latest_price"] = price
-
         maybe_log_price(cfg, price)
         check_breakout(cfg, price)
     except Exception as e:
-        print("[" + get_ist_time() + "] WS message parse error: " + str(e) + " | Raw message: " + str(message), flush=True)
-
+        pass
 
 def on_ws_error(ws, error):
-    print("[" + get_ist_time() + "] WebSocket error: " + str(error), flush=True)
+    pass
 
-
-def on_ws_close(ws, close_status_code, close_msg):
-    print("[" + get_ist_time() + "] WebSocket closed (code=" + str(close_status_code) + ", msg=" + str(close_msg) + "). Will reconnect...", flush=True)
-
+def on_ws_close(ws, code, msg):
+    pass
 
 def start_price_websocket():
     while True:
         try:
             ws = websocket.WebSocketApp(WS_URL, on_open=on_ws_open, on_message=on_ws_message, on_error=on_ws_error, on_close=on_ws_close)
             ws.run_forever(ping_interval=30, ping_timeout=10)
-        except Exception as e:
-            print("[" + get_ist_time() + "] WebSocket thread exception: " + str(e), flush=True)
-        print("[" + get_ist_time() + "] Reconnecting WebSocket in " + str(WS_RECONNECT_DELAY) + " seconds...", flush=True)
+        except Exception:
+            pass
         time.sleep(WS_RECONNECT_DELAY)
-
 
 def candle_watcher_loop():
     for cfg in SYMBOLS_CONFIG:
-        symbol = cfg["symbol"]
         with state_lock:
-            state[symbol]["next_close_time"] = get_next_candle_close_time(cfg["resolution"])
-
-    print("[" + get_ist_time() + "] Candle watcher started. Each symbol runs on its own configured resolution. Waiting for current running candle to close per symbol before marking any reference.", flush=True)
-
+            state[cfg["symbol"]]["next_close_time"] = get_next_candle_close_time(cfg["resolution"])
     while True:
         try:
             now = time.time()
-
             for cfg in SYMBOLS_CONFIG:
                 symbol = cfg["symbol"]
                 resolution = cfg["resolution"]
                 candle_seconds = get_candle_seconds(resolution)
-
                 with state_lock:
                     s = state[symbol]
                     next_close_time = s["next_close_time"]
@@ -486,7 +389,6 @@ def candle_watcher_loop():
 
                 if now >= next_close_time and pending_start is None:
                     with state_lock:
-                        s = state[symbol]
                         s["pending_candle_start"] = s["next_close_time"] - candle_seconds
                         s["pending_deadline"] = now + CANDLE_FETCH_RETRY_WINDOW
                         s["next_close_time"] += candle_seconds
@@ -502,16 +404,12 @@ def candle_watcher_loop():
                             state[symbol]["pending_candle_start"] = None
                             state[symbol]["pending_deadline"] = None
                     elif now > pending_deadline:
-                        log(symbol, "Candle fetch FAILED after " + str(CANDLE_FETCH_RETRY_WINDOW) + "s of retries. Skipping this candle cycle.")
                         with state_lock:
                             state[symbol]["pending_candle_start"] = None
                             state[symbol]["pending_deadline"] = None
-
             time.sleep(CANDLE_WATCHER_TICK)
-        except Exception as e:
-            print("[" + get_ist_time() + "] Candle watcher error: " + str(e), flush=True)
+        except Exception:
             time.sleep(CANDLE_WATCHER_TICK)
-
 
 def position_watcher_loop():
     while True:
@@ -519,12 +417,14 @@ def position_watcher_loop():
             for cfg in SYMBOLS_CONFIG:
                 symbol = cfg["symbol"]
                 product_id = cfg["product_id"]
+                quantity = cfg["quantity"]
 
                 with state_lock:
                     locally_open = state[symbol]["position_open"]
+                    side = state[symbol]["position_side"]
+                    entry = state[symbol]["entry_price"]
 
-                size, entry_price = get_position_size_and_entry(product_id)
-
+                size, api_entry = get_position_size_and_entry(product_id)
                 if size is None:
                     continue
 
@@ -532,47 +432,139 @@ def position_watcher_loop():
                     with state_lock:
                         state[symbol]["position_open"] = True
                         state[symbol]["position_side"] = "buy" if size > 0 else "sell"
-                    log(symbol, "Position detected on resume/sync -> size=" + str(size) + ", entry_price=" + str(entry_price))
-
+                        state[symbol]["entry_price"] = api_entry
                 elif size == 0 and locally_open:
+                    _, exit_price = get_exit_reason_and_details(product_id)
+                    exit_val = exit_price if exit_price else (state[symbol]["latest_price"] or 0)
+                    
+                    pnl = 0.0
+                    if entry:
+                        if side == "buy":
+                            pnl = (exit_val - entry) * quantity
+                        else:
+                            pnl = (entry - exit_val) * quantity
+
+                    is_win = pnl > 0
+
                     with state_lock:
                         state[symbol]["position_open"] = False
                         state[symbol]["position_side"] = None
-                    reason, exit_price = get_exit_reason(product_id)
-                    if exit_price:
-                        log(symbol, "POSITION CLOSED -> Reason: " + reason + " | Exit Price=" + str(exit_price))
-                    else:
-                        log(symbol, "POSITION CLOSED -> Reason: " + reason)
-                    log(symbol, "Ready for next qualifying breakout.")
+                        state[symbol]["entry_price"] = None
+                        state[symbol]["total_trades"] += 1
+                        if is_win:
+                            state[symbol]["wins"] += 1
+                        else:
+                            state[symbol]["losses"] += 1
+                        state[symbol]["net_pnl"] += pnl
+
+                        trade_logs.insert(0, {
+                            "time": get_ist_time(),
+                            "coin": symbol,
+                            "type": str(side).upper() if side else "TRADE",
+                            "entry": round(entry, 4) if entry else 0,
+                            "exit": round(exit_val, 4),
+                            "pnl": round(pnl, 2)
+                        })
+                        if len(trade_logs) > 50:
+                            trade_logs.pop()
+
+                    log(symbol, "TRADE CLOSED -> PnL: " + str(round(pnl, 2)))
 
             time.sleep(POSITION_WATCHER_INTERVAL)
-        except Exception as e:
-            print("[" + get_ist_time() + "] Position watcher error: " + str(e), flush=True)
+        except Exception:
             time.sleep(POSITION_WATCHER_INTERVAL)
 
-
-from flask import Flask
+# ==================== WEB DASHBOARD UI ====================
 app = Flask(__name__)
 
+DASHBOARD_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Supertrend Multi-Coin Dashboard</title>
+    <meta http-equiv="refresh" content="5">
+    <style>
+        body { background-color: #0d1117; color: #c9d1d9; font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #58a6ff; margin-bottom: 30px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; margin-bottom: 40px; }
+        .card { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h3 { margin: 0 0 10px 0; color: #f0f6fc; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+        .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 14px; }
+        .pnl-pos { color: #3fb950; font-weight: bold; }
+        .pnl-neg { color: #f85149; font-weight: bold; }
+        
+        .table-container { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; overflow-x: auto; }
+        h2 { color: #f0f6fc; margin-top: 0; text-align: center; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; text-align: left; }
+        th, td { padding: 12px; border-bottom: 1px solid #30363d; font-size: 14px; }
+        th { color: #8b949e; background-color: #21262d; }
+    </style>
+</head>
+<body>
+    <h1>📊 Supertrend Multi-Coin Dashboard</h1>
+    
+    <div class="grid">
+        {% for symbol, data in states.items() %}
+        <div class="card">
+            <h3>{{ symbol }}</h3>
+            <div class="row"><span>Total Trades:</span> <span>{{ data.total_trades }}</span></div>
+            <div class="row"><span>Wins / Losses:</span> <span>{{ data.wins }} / {{ data.losses }}</span></div>
+            <div class="row"><span>Net P&L:</span> <span class="{% if data.net_pnl >= 0 %}pnl-pos{% else %}pnl-neg{% endif %}">${{ "%.2f"|format(data.net_pnl) }}</span></div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="table-container">
+        <h2>📜 Live Executed Trade Logs</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Coin</th>
+                    <th>Type</th>
+                    <th>Entry</th>
+                    <th>Exit</th>
+                    <th>P&L</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if logs %}
+                    {% for log in logs %}
+                    <tr>
+                        <td>{{ log.time }}</td>
+                        <td>{{ log.coin }}</td>
+                        <td>{{ log.type }}</td>
+                        <td>{{ log.entry }}</td>
+                        <td>{{ log.exit }}</td>
+                        <td class="{% if log.pnl >= 0 %}pnl-pos{% else %}pnl-neg{% endif %}">${{ log.pnl }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="6" style="text-align: center; color: #8b949e;">No trades executed yet.</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+"""
+
+@app.route("/")
+def home():
+    with state_lock:
+        current_states = {sym: dict(st) for sym, st in state.items()}
+        current_logs = list(trade_logs)
+    return render_template_string(DASHBOARD_HTML, states=current_states, logs=current_logs)
 
 @app.route("/ping")
 def ping():
     return {"status": "alive", "time": get_ist_time()}, 200
 
-
-@app.route("/")
-def home():
-    return {"status": "bot running", "symbols": [cfg["symbol"] for cfg in SYMBOLS_CONFIG]}, 200
-
-
 if __name__ == "__main__":
     threading.Thread(target=start_price_websocket, daemon=True).start()
     threading.Thread(target=candle_watcher_loop, daemon=True).start()
     threading.Thread(target=position_watcher_loop, daemon=True).start()
-
-    print("[" + get_ist_time() + "] Multi-symbol bot started. RR=1:" + str(RR_RATIO), flush=True)
-    for cfg in SYMBOLS_CONFIG:
-        print("  -> " + cfg["symbol"] + " | Resolution=" + cfg["resolution"] + " | Qty=" + str(cfg["quantity"]) + " lot(s) | Range=" + str(cfg["range_points"]) + " pts | TSL=" + str(cfg["tsl_points"]) + " pts | tick_size=" + str(cfg["tick_size"]), flush=True)
 
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
