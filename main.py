@@ -58,6 +58,7 @@ state_lock = threading.Lock()
 
 state = {}
 trade_logs = []
+contract_value_cache = {}
 
 for cfg in SYMBOLS_CONFIG:
     state[cfg["symbol"]] = {
@@ -145,6 +146,25 @@ def fetch_candle_by_start_time(resolution, symbol, expected_start_time):
         log(symbol, "⚠️ Error fetching candles: " + str(e))
         return None
 
+def get_contract_value(symbol):
+    """Fetches and caches the contract_value (lot size in underlying units)
+    for a symbol from the public /v2/products/{symbol} endpoint.
+    Used only as a safety-net multiplier for manual PnL fallback calculations."""
+    if symbol in contract_value_cache:
+        return contract_value_cache[symbol]
+    url = BASE_URL + "/v2/products/" + symbol
+    try:
+        resp = requests.get(url, timeout=(3, 10))
+        data = resp.json()
+        if data.get("success"):
+            cv = data.get("result", {}).get("contract_value")
+            if cv is not None:
+                contract_value_cache[symbol] = float(cv)
+                return float(cv)
+    except Exception:
+        pass
+    return 1.0
+
 def get_position_size_and_entry(product_id):
     method = "GET"
     path = "/v2/positions"
@@ -175,50 +195,45 @@ def get_order_by_id(order_id):
 
 def get_exit_reason_and_details(product_id):
     """
-    Fetches the actual FILLED closing order from Delta's order history.
-    Fixes the duplicate-bracket-leg bug: brackets create BOTH an SL and TP
-    order record, but only one actually fills. We must only consider the
-    order that has a real average_fill_price / execution_price, and trust
-    Delta's own realized_pnl (matches the Order History "Realized PnL" column).
+    Fetches the closing fill from Delta's /v2/fills endpoint.
+    A position is fully closed when meta_data.new_position.size == 0.
+    That fill's price/created_at/realized_pnl are the authoritative
+    exit price, exit time, and PnL exactly as shown in Delta Order History.
     """
     method = "GET"
-    path = "/v2/orders/history"
-    query_string = "?product_ids=" + str(product_id) + "&page_size=10"
+    path = "/v2/fills"
+    query_string = "?product_ids=" + str(product_id) + "&page_size=5"
     url = BASE_URL + path
     headers = get_headers(method, path, query_string)
     try:
-        resp = requests.get(url, params={"product_ids": str(product_id), "page_size": 10}, headers=headers, timeout=(3, 10))
+        resp = requests.get(url, params={"product_ids": str(product_id), "page_size": 5}, headers=headers, timeout=(3, 10))
         data = resp.json()
         if data.get("success"):
-            orders = data.get("result", [])
+            fills = data.get("result", [])
+            fills.sort(key=lambda f: float(f.get("created_at", 0) or 0), reverse=True)
 
-            # Only keep orders that actually got FILLED (ignore cancelled/unfilled bracket legs)
-            filled_orders = [
-                o for o in orders
-                if o.get("state") == "closed" and (o.get("average_fill_price") or o.get("execution_price"))
-            ]
+            for f in fills:
+                meta = f.get("meta_data", {}) or {}
+                new_pos = meta.get("new_position", {}) or {}
 
-            if filled_orders:
-                filled_orders.sort(key=lambda o: int(o.get("created_at", 0) or 0), reverse=True)
-                latest = filled_orders[0]
+                if new_pos.get("size") == 0:
+                    exit_price_raw = f.get("price")
+                    realized_pnl = new_pos.get("realized_pnl")
+                    fill_time_raw = f.get("created_at")
+                    order_type = str(meta.get("order_type", "")).lower()
 
-                stop_type = latest.get("stop_order_type")
-                order_type = latest.get("order_type")
-                fill_price = latest.get("average_fill_price") or latest.get("execution_price")
-                realized_pnl = latest.get("realized_pnl")
-                fill_time_raw = latest.get("created_at")
+                    if "stop" in order_type:
+                        reason = "🛡️ TSL HIT"
+                    elif "take_profit" in order_type or "profit" in order_type:
+                        reason = "🎯 TP HIT"
+                    else:
+                        reason = "⚡ CLOSED"
 
-                if stop_type == "stop_loss_order" or "stop" in str(order_type).lower():
-                    reason = "🛡️ TSL HIT"
-                elif stop_type == "take_profit_order" or "profit" in str(order_type).lower():
-                    reason = "🎯 TP HIT"
-                else:
-                    reason = "⚡ CLOSED"
+                    exit_price_val = float(exit_price_raw) if exit_price_raw is not None else None
+                    pnl_val = float(realized_pnl) if realized_pnl is not None else None
+                    fill_time_str = epoch_to_ist(fill_time_raw) if fill_time_raw else None
 
-                pnl_val = float(realized_pnl) if realized_pnl is not None else None
-                fill_time_str = epoch_to_ist(fill_time_raw) if fill_time_raw else None
-
-                return reason, float(fill_price), pnl_val, fill_time_str
+                    return reason, exit_price_val, pnl_val, fill_time_str
 
         return "⚡ CLOSED", None, None, None
     except Exception as e:
@@ -509,15 +524,18 @@ def position_watcher_loop():
                     exit_val = exit_price if exit_price is not None else (state[symbol]["latest_price"] or 0)
                     exit_time_str = api_exit_time if api_exit_time else get_ist_time()
 
-                    # Trust Delta's own realized_pnl (matches Order History "Realized PnL" column exactly).
-                    # Only fall back to manual calc if API didn't return a PnL value at all.
+                    # Trust Delta's own realized_pnl from /v2/fills (matches Order History
+                    # "Realized PnL" column exactly). Only fall back to manual calc if the
+                    # fills API didn't return a PnL value at all, and in that case scale by
+                    # contract_value so the math matches actual notional exposure.
                     if api_pnl is not None:
                         pnl = api_pnl
                     elif entry is not None:
+                        contract_value = get_contract_value(symbol)
                         if side == "buy":
-                            pnl = (exit_val - entry) * quantity
+                            pnl = (exit_val - entry) * quantity * contract_value
                         else:
-                            pnl = (entry - exit_val) * quantity
+                            pnl = (entry - exit_val) * quantity * contract_value
                     else:
                         pnl = 0.0
 
