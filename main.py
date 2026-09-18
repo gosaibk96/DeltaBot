@@ -32,8 +32,8 @@ WS_RECONNECT_DELAY = 3
 PRICE_LOG_INTERVAL = 5
 
 SYMBOLS_CONFIG = [
-    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "5m", "quantity": 2, "range_points": 50,    "tsl_points": 50},
-    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "5m", "quantity": 1, "range_points": 4,      "tsl_points": 4},
+    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "5m", "quantity": 2, "range_points": 100,    "tsl_points": 100},
+    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "5m", "quantity": 1, "range_points": 8,      "tsl_points": 8},
     {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "15m", "quantity": 0, "range_points": 8,      "tsl_points": 8},
     {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "15m", "quantity": 0, "range_points": 0.20,      "tsl_points": 0.20},
     {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 0, "range_points": 0.0065, "tsl_points": 0.0065},
@@ -80,6 +80,19 @@ for cfg in SYMBOLS_CONFIG:
 
 def get_ist_time():
     return datetime.now(ist).strftime('%Y-%m-%d %H:%M:%S')
+
+def epoch_to_ist(epoch_val):
+    """Converts a Delta API timestamp (seconds/ms/microseconds) to IST string.
+    Falls back to current time if conversion fails."""
+    try:
+        ts = float(epoch_val)
+        if ts > 1e15:
+            ts = ts / 1e6
+        elif ts > 1e12:
+            ts = ts / 1e3
+        return datetime.fromtimestamp(ts, ist).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return get_ist_time()
 
 def log(symbol, msg):
     print("[" + get_ist_time() + "][" + symbol + "] " + str(msg), flush=True)
@@ -161,6 +174,13 @@ def get_order_by_id(order_id):
         return None
 
 def get_exit_reason_and_details(product_id):
+    """
+    Fetches the actual FILLED closing order from Delta's order history.
+    Fixes the duplicate-bracket-leg bug: brackets create BOTH an SL and TP
+    order record, but only one actually fills. We must only consider the
+    order that has a real average_fill_price / execution_price, and trust
+    Delta's own realized_pnl (matches the Order History "Realized PnL" column).
+    """
     method = "GET"
     path = "/v2/orders/history"
     query_string = "?product_ids=" + str(product_id) + "&page_size=10"
@@ -171,24 +191,38 @@ def get_exit_reason_and_details(product_id):
         data = resp.json()
         if data.get("success"):
             orders = data.get("result", [])
-            closed_orders = [o for o in orders if o.get("state") == "closed"]
-            if closed_orders:
-                closed_orders.sort(key=lambda o: int(o.get("created_at", 0)), reverse=True)
-                latest = closed_orders[0]
+
+            # Only keep orders that actually got FILLED (ignore cancelled/unfilled bracket legs)
+            filled_orders = [
+                o for o in orders
+                if o.get("state") == "closed" and (o.get("average_fill_price") or o.get("execution_price"))
+            ]
+
+            if filled_orders:
+                filled_orders.sort(key=lambda o: int(o.get("created_at", 0) or 0), reverse=True)
+                latest = filled_orders[0]
+
                 stop_type = latest.get("stop_order_type")
                 order_type = latest.get("order_type")
                 fill_price = latest.get("average_fill_price") or latest.get("execution_price")
-                realized_pnl = latest.get("realized_pnl") or 0.0
-                
+                realized_pnl = latest.get("realized_pnl")
+                fill_time_raw = latest.get("created_at")
+
                 if stop_type == "stop_loss_order" or "stop" in str(order_type).lower():
-                    return "🛡️ TSL HIT", fill_price, float(realized_pnl)
+                    reason = "🛡️ TSL HIT"
                 elif stop_type == "take_profit_order" or "profit" in str(order_type).lower():
-                    return "🎯 TP HIT", fill_price, float(realized_pnl)
+                    reason = "🎯 TP HIT"
                 else:
-                    return "⚡ CLOSED", fill_price, float(realized_pnl)
-        return "⚡ CLOSED", None, 0.0
+                    reason = "⚡ CLOSED"
+
+                pnl_val = float(realized_pnl) if realized_pnl is not None else None
+                fill_time_str = epoch_to_ist(fill_time_raw) if fill_time_raw else None
+
+                return reason, float(fill_price), pnl_val, fill_time_str
+
+        return "⚡ CLOSED", None, None, None
     except Exception as e:
-        return "⚡ CLOSED", None, 0.0
+        return "⚡ CLOSED", None, None, None
 
 def place_entry_order_with_trailing_bracket(product_id, product_symbol, side, size, trail_amount_str, tp_price_str):
     method = "POST"
@@ -233,15 +267,22 @@ def emergency_close_position(product_id, product_symbol, side, quantity):
     except Exception as e:
         return None
 
-def get_average_fill_price(order_id, retries=8):
+def get_average_fill_price_and_time(order_id, retries=8):
+    """Returns (fill_price, fill_time_str) using Delta's own order timestamp,
+    so dashboard Entry Time matches Delta's Order History exactly."""
     fill_price = None
+    fill_time_str = None
     while fill_price is None and retries > 0:
         time.sleep(0.5)
         fresh = get_order_by_id(order_id)
         if fresh and fresh.get("success"):
-            fill_price = fresh.get("result", {}).get("average_fill_price")
+            result = fresh.get("result", {})
+            fill_price = result.get("average_fill_price")
+            raw_time = result.get("updated_at") or result.get("created_at")
+            if raw_time:
+                fill_time_str = epoch_to_ist(raw_time)
         retries -= 1
-    return float(fill_price) if fill_price else None
+    return (float(fill_price) if fill_price else None), fill_time_str
 
 def evaluate_candle_data(cfg, candle):
     symbol = cfg["symbol"]
@@ -282,7 +323,7 @@ def execute_breakout_trade(cfg, side, trigger_price):
     order_resp = place_entry_order_with_trailing_bracket(product_id, symbol, side, quantity, trail_amount_str, tp_price_str)
     if not order_resp or not order_resp.get("success"):
         log(symbol, "❌ ENTRY FAILED")
-        return False, False, None
+        return False, False, None, None
 
     result = order_resp.get("result", {})
     order_id = result.get("id")
@@ -291,13 +332,15 @@ def execute_breakout_trade(cfg, side, trigger_price):
 
     if returned_trail is None or returned_tp is None:
         emergency_close_position(product_id, symbol, side, quantity)
-        return False, True, None
+        return False, True, None, None
 
-    fill_price = get_average_fill_price(order_id)
+    fill_price, fill_time_str = get_average_fill_price_and_time(order_id)
     actual_entry = fill_price if fill_price else trigger_price
+    actual_entry_time = fill_time_str if fill_time_str else get_ist_time()
+
     side_icon = "🟢 [BUY]" if side == "buy" else "🔴 [SELL]"
     log(symbol, "🚀 ENTRY SUCCESS " + side_icon + " @ " + str(actual_entry))
-    return True, False, actual_entry
+    return True, False, actual_entry, actual_entry_time
 
 def check_breakout(cfg, price):
     symbol = cfg["symbol"]
@@ -316,12 +359,11 @@ def check_breakout(cfg, price):
 
         s["position_open"] = True
         s["position_side"] = side
-        s["entry_time"] = get_ist_time()
         s["reference_candle"] = None
 
     side_label = "BUY" if side == "buy" else "SELL"
     log(symbol, "⚡ BREAKOUT (" + side_label + ") @ " + str(price))
-    entered, bracket_failed, entry_price = execute_breakout_trade(cfg, side, price)
+    entered, bracket_failed, entry_price, entry_time_str = execute_breakout_trade(cfg, side, price)
 
     with state_lock:
         s = state[symbol]
@@ -333,6 +375,7 @@ def check_breakout(cfg, price):
                 s["cooldown_until"] = time.time() + (get_candle_seconds(cfg["resolution"]) * COOLDOWN_CANDLES)
         else:
             s["entry_price"] = entry_price
+            s["entry_time"] = entry_time_str
 
 def maybe_log_price(cfg, price):
     symbol = cfg["symbol"]
@@ -455,22 +498,30 @@ def position_watcher_loop():
                     with state_lock:
                         state[symbol]["position_open"] = True
                         state[symbol]["position_side"] = "buy" if size > 0 else "sell"
-                        state[symbol]["entry_price"] = api_entry
+                        # FIX: Delta API returns entry_price as a string, must cast to float
+                        state[symbol]["entry_price"] = float(api_entry) if api_entry is not None else None
                         if not state[symbol]["entry_time"]:
                             state[symbol]["entry_time"] = get_ist_time()
+
                 elif size == 0 and locally_open:
-                    exit_reason, exit_price, api_pnl = get_exit_reason_and_details(product_id)
-                    exit_val = exit_price if exit_price else (state[symbol]["latest_price"] or 0)
-                    
-                    pnl = api_pnl
-                    if pnl == 0.0 and entry:
+                    exit_reason, exit_price, api_pnl, api_exit_time = get_exit_reason_and_details(product_id)
+
+                    exit_val = exit_price if exit_price is not None else (state[symbol]["latest_price"] or 0)
+                    exit_time_str = api_exit_time if api_exit_time else get_ist_time()
+
+                    # Trust Delta's own realized_pnl (matches Order History "Realized PnL" column exactly).
+                    # Only fall back to manual calc if API didn't return a PnL value at all.
+                    if api_pnl is not None:
+                        pnl = api_pnl
+                    elif entry is not None:
                         if side == "buy":
                             pnl = (exit_val - entry) * quantity
                         else:
                             pnl = (entry - exit_val) * quantity
+                    else:
+                        pnl = 0.0
 
                     is_win = pnl > 0
-                    exit_time_str = get_ist_time()
 
                     with state_lock:
                         state[symbol]["position_open"] = False
@@ -488,7 +539,7 @@ def position_watcher_loop():
                             "exit_time": exit_time_str,
                             "coin": symbol,
                             "type": (str(side).upper() if side else "TRADE") + " | " + exit_reason,
-                            "entry": round(entry, 4) if entry else 0,
+                            "entry": round(entry, 4) if entry is not None else 0,
                             "exit": round(exit_val, 4),
                             "pnl": round(pnl, 2)
                         })
