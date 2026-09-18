@@ -32,24 +32,24 @@ WS_RECONNECT_DELAY = 3
 PRICE_LOG_INTERVAL = 5
 
 SYMBOLS_CONFIG = [
-    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "1h", "quantity": 1, "range_points": 200,    "tsl_points": 200},
-    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "1h", "quantity": 1, "range_points": 8,      "tsl_points": 8},
-    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "1h", "quantity": 10, "range_points": 8,      "tsl_points": 8},
-    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "1h", "quantity": 5, "range_points": 0.20,      "tsl_points": 0.20},
-    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0065, "tsl_points": 0.0065},
-    {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0150, "tsl_points": 0.0150},
-    {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
-    {"symbol": "EVAAUSD",    "product_id": 98745,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
-    {"symbol": "COAIUSD",    "product_id": 98572,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0015, "tsl_points": 0.0015},
-    {"symbol": "ASTERUSD",   "product_id": 96160,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
-    {"symbol": "MUSD",       "product_id": 84925,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0060, "tsl_points": 0.0060},
-    {"symbol": "VIRTUALUSD", "product_id": 54903,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0030, "tsl_points": 0.0030},
-    {"symbol": "ZROUSD",     "product_id": 26457,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0055, "tsl_points": 0.0055},
-    {"symbol": "RUNEUSD",    "product_id": 21522,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
-    {"symbol": "APTUSD",     "product_id": 20196,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0030, "tsl_points": 0.0030},
-    {"symbol": "FILUSD",     "product_id": 19617,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0040, "tsl_points": 0.0040},
-    {"symbol": "LDOUSD",     "product_id": 19616,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0020, "tsl_points": 0.0020},
-    {"symbol": "ONDOUSD",    "product_id": 19300,  "tick_size": 0.0001, "resolution": "4h", "quantity": 1, "range_points": 0.0020, "tsl_points": 0.0020},
+    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "15m", "quantity": 1, "range_points": 200,    "tsl_points": 200},
+    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 1, "range_points": 8,      "tsl_points": 8},
+    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "15m", "quantity": 10, "range_points": 8,      "tsl_points": 8},
+    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "15m", "quantity": 5, "range_points": 0.20,      "tsl_points": 0.20},
+    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 1, "range_points": 0.0065, "tsl_points": 0.0065},
+    {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0150, "tsl_points": 0.0150},
+    {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
+    {"symbol": "EVAAUSD",    "product_id": 98745,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
+    {"symbol": "COAIUSD",    "product_id": 98572,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0015, "tsl_points": 0.0015},
+    {"symbol": "ASTERUSD",   "product_id": 96160,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0035, "tsl_points": 0.0035},
+    {"symbol": "MUSD",       "product_id": 84925,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0060, "tsl_points": 0.0060},
+    {"symbol": "VIRTUALUSD", "product_id": 54903,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0030, "tsl_points": 0.0030},
+    {"symbol": "ZROUSD",     "product_id": 26457,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0055, "tsl_points": 0.0055},
+    {"symbol": "RUNEUSD",    "product_id": 21522,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0025, "tsl_points": 0.0025},
+    {"symbol": "APTUSD",     "product_id": 20196,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0030, "tsl_points": 0.0030},
+    {"symbol": "FILUSD",     "product_id": 19617,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0040, "tsl_points": 0.0040},
+    {"symbol": "LDOUSD",     "product_id": 19616,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0020, "tsl_points": 0.0020},
+    {"symbol": "ONDOUSD",    "product_id": 19300,  "tick_size": 0.0001, "resolution": "1h", "quantity": 1, "range_points": 0.0020, "tsl_points": 0.0020},
 ]
 
 symbol_lookup = {cfg["symbol"]: cfg for cfg in SYMBOLS_CONFIG}
@@ -163,11 +163,11 @@ def get_order_by_id(order_id):
 def get_exit_reason_and_details(product_id):
     method = "GET"
     path = "/v2/orders/history"
-    query_string = "?product_ids=" + str(product_id) + "&order_types=all_stop&page_size=5"
+    query_string = "?product_ids=" + str(product_id) + "&page_size=10"
     url = BASE_URL + path
     headers = get_headers(method, path, query_string)
     try:
-        resp = requests.get(url, params={"product_ids": str(product_id), "order_types": "all_stop", "page_size": 5}, headers=headers, timeout=(3, 10))
+        resp = requests.get(url, params={"product_ids": str(product_id), "page_size": 10}, headers=headers, timeout=(3, 10))
         data = resp.json()
         if data.get("success"):
             orders = data.get("result", [])
@@ -176,14 +176,19 @@ def get_exit_reason_and_details(product_id):
                 closed_orders.sort(key=lambda o: int(o.get("created_at", 0)), reverse=True)
                 latest = closed_orders[0]
                 stop_type = latest.get("stop_order_type")
-                fill_price = latest.get("average_fill_price")
-                if stop_type == "stop_loss_order":
-                    return "🛡️ TSL HIT", fill_price
-                elif stop_type == "take_profit_order":
-                    return "🎯 TP HIT", fill_price
-        return "⚡ CLOSED", None
+                order_type = latest.get("order_type")
+                fill_price = latest.get("average_fill_price") or latest.get("execution_price")
+                realized_pnl = latest.get("realized_pnl") or 0.0
+                
+                if stop_type == "stop_loss_order" or "stop" in str(order_type).lower():
+                    return "🛡️ TSL HIT", fill_price, float(realized_pnl)
+                elif stop_type == "take_profit_order" or "profit" in str(order_type).lower():
+                    return "🎯 TP HIT", fill_price, float(realized_pnl)
+                else:
+                    return "⚡ CLOSED", fill_price, float(realized_pnl)
+        return "⚡ CLOSED", None, 0.0
     except Exception as e:
-        return "⚡ CLOSED", None
+        return "⚡ CLOSED", None, 0.0
 
 def place_entry_order_with_trailing_bracket(product_id, product_symbol, side, size, trail_amount_str, tp_price_str):
     method = "POST"
@@ -454,11 +459,11 @@ def position_watcher_loop():
                         if not state[symbol]["entry_time"]:
                             state[symbol]["entry_time"] = get_ist_time()
                 elif size == 0 and locally_open:
-                    exit_reason, exit_price = get_exit_reason_and_details(product_id)
+                    exit_reason, exit_price, api_pnl = get_exit_reason_and_details(product_id)
                     exit_val = exit_price if exit_price else (state[symbol]["latest_price"] or 0)
                     
-                    pnl = 0.0
-                    if entry:
+                    pnl = api_pnl
+                    if pnl == 0.0 and entry:
                         if side == "buy":
                             pnl = (exit_val - entry) * quantity
                         else:
