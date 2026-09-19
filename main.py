@@ -32,10 +32,10 @@ WS_RECONNECT_DELAY = 3
 PRICE_LOG_INTERVAL = 5
 
 SYMBOLS_CONFIG = [
-    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "5m", "quantity": 2, "range_points": 100,    "tsl_points": 100},
-    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "5m", "quantity": 1, "range_points": 8,      "tsl_points": 8},
-    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "15m", "quantity": 0, "range_points": 8,      "tsl_points": 8},
-    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "15m", "quantity": 0, "range_points": 0.20,      "tsl_points": 0.20},
+    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "1h", "quantity": 0, "range_points": 100,    "tsl_points": 100},
+    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 5, "range_points": 10,      "tsl_points": 10},
+    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "5m", "quantity": 10, "range_points": 8,      "tsl_points": 8},
+    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "5m", "quantity": 1, "range_points": 0.20,      "tsl_points": 0.20},
     {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 0, "range_points": 0.0065, "tsl_points": 0.0065},
     {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0150, "tsl_points": 0.0150},
     {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0035, "tsl_points": 0.0035},
