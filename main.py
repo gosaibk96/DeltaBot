@@ -18,7 +18,6 @@ BASE_URL = "https://api.india.delta.exchange"
 WS_URL = "wss://socket.india.delta.exchange"
 
 CANDLE_RANGE_MIN_POINTS = 0
-RR_RATIO = 4
 
 STOP_TRIGGER_METHOD = "mark_price"
 
@@ -31,25 +30,26 @@ COOLDOWN_CANDLES = 3
 WS_RECONNECT_DELAY = 3
 PRICE_LOG_INTERVAL = 5
 
+# NOTE: "tgt_points" is now an independent per-symbol field (not a global ratio).
 SYMBOLS_CONFIG = [
-    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "1h", "quantity": 0, "range_points": 100,    "tsl_points": 100},
-    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 5, "range_points": 10,      "tsl_points": 10},
-    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "5m", "quantity": 10, "range_points": 8,      "tsl_points": 8},
-    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "5m", "quantity": 1, "range_points": 0.20,      "tsl_points": 0.20},
-    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 0, "range_points": 0.0065, "tsl_points": 0.0065},
-    {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0150, "tsl_points": 0.0150},
-    {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0035, "tsl_points": 0.0035},
-    {"symbol": "EVAAUSD",    "product_id": 98745,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0025, "tsl_points": 0.0025},
-    {"symbol": "COAIUSD",    "product_id": 98572,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0015, "tsl_points": 0.0015},
-    {"symbol": "ASTERUSD",   "product_id": 96160,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0035, "tsl_points": 0.0035},
-    {"symbol": "MUSD",       "product_id": 84925,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0060, "tsl_points": 0.0060},
-    {"symbol": "VIRTUALUSD", "product_id": 54903,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0030, "tsl_points": 0.0030},
-    {"symbol": "ZROUSD",     "product_id": 26457,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0055, "tsl_points": 0.0055},
-    {"symbol": "RUNEUSD",    "product_id": 21522,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0025, "tsl_points": 0.0025},
-    {"symbol": "APTUSD",     "product_id": 20196,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0030, "tsl_points": 0.0030},
-    {"symbol": "FILUSD",     "product_id": 19617,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0040, "tsl_points": 0.0040},
-    {"symbol": "LDOUSD",     "product_id": 19616,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0020, "tsl_points": 0.0020},
-    {"symbol": "ONDOUSD",    "product_id": 19300,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0020, "tsl_points": 0.0020},
+    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "2h", "quantity": 5, "range_points": 200,    "tsl_points": 440,    "tgt_points": 1500},
+    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 5, "range_points": 10,      "tsl_points": 10,     "tgt_points": 45},
+    {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "15m", "quantity": 100, "range_points": 5,      "tsl_points": 5,      "tgt_points": 22},
+    {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "5m", "quantity": 0, "range_points": 0.20,      "tsl_points": 0.20,   "tgt_points": 0.80},
+    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 0, "range_points": 0.0065, "tsl_points": 0.0065, "tgt_points": 0.0260},
+    {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0150, "tsl_points": 0.0150, "tgt_points": 0.0600},
+    {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0035, "tsl_points": 0.0035, "tgt_points": 0.0140},
+    {"symbol": "EVAAUSD",    "product_id": 98745,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0025, "tsl_points": 0.0025, "tgt_points": 0.0100},
+    {"symbol": "COAIUSD",    "product_id": 98572,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0015, "tsl_points": 0.0015, "tgt_points": 0.0060},
+    {"symbol": "ASTERUSD",   "product_id": 96160,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0035, "tsl_points": 0.0035, "tgt_points": 0.0140},
+    {"symbol": "MUSD",       "product_id": 84925,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0060, "tsl_points": 0.0060, "tgt_points": 0.0240},
+    {"symbol": "VIRTUALUSD", "product_id": 54903,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0030, "tsl_points": 0.0030, "tgt_points": 0.0120},
+    {"symbol": "ZROUSD",     "product_id": 26457,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0055, "tsl_points": 0.0055, "tgt_points": 0.0220},
+    {"symbol": "RUNEUSD",    "product_id": 21522,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0025, "tsl_points": 0.0025, "tgt_points": 0.0100},
+    {"symbol": "APTUSD",     "product_id": 20196,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0030, "tsl_points": 0.0030, "tgt_points": 0.0120},
+    {"symbol": "FILUSD",     "product_id": 19617,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0040, "tsl_points": 0.0040, "tgt_points": 0.0160},
+    {"symbol": "LDOUSD",     "product_id": 19616,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0020, "tsl_points": 0.0020, "tgt_points": 0.0080},
+    {"symbol": "ONDOUSD",    "product_id": 19300,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0020, "tsl_points": 0.0020, "tgt_points": 0.0080},
 ]
 
 symbol_lookup = {cfg["symbol"]: cfg for cfg in SYMBOLS_CONFIG}
@@ -76,7 +76,8 @@ for cfg in SYMBOLS_CONFIG:
         "total_trades": 0,
         "wins": 0,
         "losses": 0,
-        "net_pnl": 0.0
+        "net_pnl": 0.0,
+        "total_fees": 0.0
     }
 
 def get_ist_time():
@@ -199,6 +200,10 @@ def get_exit_reason_and_details(product_id):
     A position is fully closed when meta_data.new_position.size == 0.
     That fill's price/created_at/realized_pnl are the authoritative
     exit price, exit time, and PnL exactly as shown in Delta Order History.
+
+    Also computes the total fee for the round-trip trade by summing the
+    top-level "commission" field of the closing fill and, if identifiable,
+    the entry fill immediately preceding it in the same fills batch.
     """
     method = "GET"
     path = "/v2/fills"
@@ -212,7 +217,7 @@ def get_exit_reason_and_details(product_id):
             fills = data.get("result", [])
             fills.sort(key=lambda f: float(f.get("created_at", 0) or 0), reverse=True)
 
-            for f in fills:
+            for idx, f in enumerate(fills):
                 meta = f.get("meta_data", {}) or {}
                 new_pos = meta.get("new_position", {}) or {}
 
@@ -233,11 +238,34 @@ def get_exit_reason_and_details(product_id):
                     pnl_val = float(realized_pnl) if realized_pnl is not None else None
                     fill_time_str = epoch_to_ist(fill_time_raw) if fill_time_raw else None
 
-                    return reason, exit_price_val, pnl_val, fill_time_str
+                    # Fee = this closing fill's commission + the entry fill's commission
+                    # (the fill immediately before it in this same batch, if it opened
+                    # the position that is now being closed).
+                    total_fee = 0.0
+                    exit_commission = f.get("commission")
+                    if exit_commission is not None:
+                        try:
+                            total_fee += float(exit_commission)
+                        except Exception:
+                            pass
 
-        return "⚡ CLOSED", None, None, None
+                    if idx + 1 < len(fills):
+                        entry_fill = fills[idx + 1]
+                        entry_meta = entry_fill.get("meta_data", {}) or {}
+                        entry_new_pos = entry_meta.get("new_position", {}) or {}
+                        if entry_new_pos.get("size") != 0:
+                            entry_commission = entry_fill.get("commission")
+                            if entry_commission is not None:
+                                try:
+                                    total_fee += float(entry_commission)
+                                except Exception:
+                                    pass
+
+                    return reason, exit_price_val, pnl_val, fill_time_str, total_fee
+
+        return "⚡ CLOSED", None, None, None, 0.0
     except Exception as e:
-        return "⚡ CLOSED", None, None, None
+        return "⚡ CLOSED", None, None, None, 0.0
 
 def place_entry_order_with_trailing_bracket(product_id, product_symbol, side, size, trail_amount_str, tp_price_str):
     method = "POST"
@@ -323,12 +351,13 @@ def execute_breakout_trade(cfg, side, trigger_price):
     tick_size = cfg["tick_size"]
     quantity = cfg["quantity"]
     tsl_points = cfg["tsl_points"]
+    tgt_points = cfg["tgt_points"]
 
     if side == "buy":
-        tp_price = trigger_price + (RR_RATIO * tsl_points)
+        tp_price = trigger_price + tgt_points
         raw_trail = -abs(tsl_points)
     else:
-        tp_price = trigger_price - (RR_RATIO * tsl_points)
+        tp_price = trigger_price - tgt_points
         raw_trail = abs(tsl_points)
 
     tp_price = round_to_tick(tp_price, tick_size)
@@ -480,7 +509,11 @@ def candle_watcher_loop():
                     if candle:
                         ref = evaluate_candle_data(cfg, candle)
                         with state_lock:
-                            state[symbol]["reference_candle"] = ref
+                            # Do not bank a reference candle while a position is still open.
+                            if not state[symbol]["position_open"]:
+                                state[symbol]["reference_candle"] = ref
+                            else:
+                                state[symbol]["reference_candle"] = None
                             state[symbol]["pending_candle_start"] = None
                             state[symbol]["pending_deadline"] = None
                     elif now > pending_deadline:
@@ -519,7 +552,7 @@ def position_watcher_loop():
                             state[symbol]["entry_time"] = get_ist_time()
 
                 elif size == 0 and locally_open:
-                    exit_reason, exit_price, api_pnl, api_exit_time = get_exit_reason_and_details(product_id)
+                    exit_reason, exit_price, api_pnl, api_exit_time, trade_fee = get_exit_reason_and_details(product_id)
 
                     exit_val = exit_price if exit_price is not None else (state[symbol]["latest_price"] or 0)
                     exit_time_str = api_exit_time if api_exit_time else get_ist_time()
@@ -551,6 +584,7 @@ def position_watcher_loop():
                         else:
                             state[symbol]["losses"] += 1
                         state[symbol]["net_pnl"] += pnl
+                        state[symbol]["total_fees"] += trade_fee
 
                         trade_logs.insert(0, {
                             "entry_time": ent_time if ent_time else exit_time_str,
@@ -559,13 +593,14 @@ def position_watcher_loop():
                             "type": (str(side).upper() if side else "TRADE") + " | " + exit_reason,
                             "entry": round(entry, 4) if entry is not None else 0,
                             "exit": round(exit_val, 4),
-                            "pnl": round(pnl, 2)
+                            "pnl": round(pnl, 2),
+                            "fee": round(trade_fee, 4)
                         })
                         if len(trade_logs) > 50:
                             trade_logs.pop()
                         state[symbol]["entry_time"] = None
 
-                    log(symbol, "🏁 EXIT -> " + exit_reason + " | Exit Price: " + str(round(exit_val, 4)) + " | Net PnL: " + str(round(pnl, 2)))
+                    log(symbol, "🏁 EXIT -> " + exit_reason + " | Exit Price: " + str(round(exit_val, 4)) + " | Net PnL: " + str(round(pnl, 2)) + " | Fee: " + str(round(trade_fee, 4)))
 
             time.sleep(POSITION_WATCHER_INTERVAL)
         except Exception:
@@ -587,6 +622,7 @@ DASHBOARD_HTML = """
         .top-summary { text-align: center; background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 30px; }
         .top-summary h2 { margin: 0; color: #8b949e; font-size: 16px; }
         .total-pnl { font-size: 32px; font-weight: bold; margin: 5px 0; }
+        .total-fees { font-size: 16px; color: #d29922; margin: 5px 0; }
         .total-trades { font-size: 14px; color: #8b949e; }
         
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; margin-bottom: 40px; }
@@ -595,6 +631,7 @@ DASHBOARD_HTML = """
         .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 14px; }
         .pnl-pos { color: #3fb950; font-weight: bold; }
         .pnl-neg { color: #f85149; font-weight: bold; }
+        .fee-val { color: #d29922; font-weight: bold; }
         
         .table-container { background-color: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; overflow-x: auto; }
         h2.section-title { color: #f0f6fc; margin-top: 0; text-align: center; }
@@ -606,15 +643,17 @@ DASHBOARD_HTML = """
 <body>
     <h1>Multi-Coin Dashboard</h1>
     
-    {% set ns = namespace(total_pnl=0.0, total_trades=0) %}
+    {% set ns = namespace(total_pnl=0.0, total_trades=0, total_fees=0.0) %}
     {% for symbol, data in states.items() %}
         {% set ns.total_pnl = ns.total_pnl + data.net_pnl %}
         {% set ns.total_trades = ns.total_trades + data.total_trades %}
+        {% set ns.total_fees = ns.total_fees + data.total_fees %}
     {% endfor %}
 
     <div class="top-summary">
         <h2>Total Portfolio Net P&L</h2>
         <div class="total-pnl {% if ns.total_pnl >= 0 %}pnl-pos{% else %}pnl-neg{% endif %}">${{ "%.2f"|format(ns.total_pnl) }}</div>
+        <div class="total-fees">Total Fees Paid: ${{ "%.4f"|format(ns.total_fees) }}</div>
         <div class="total-trades">Total Trades Executed: {{ ns.total_trades }}</div>
     </div>
     
@@ -625,6 +664,7 @@ DASHBOARD_HTML = """
             <div class="row"><span>Total Trades:</span> <span>{{ data.total_trades }}</span></div>
             <div class="row"><span>Wins / Losses:</span> <span>{{ data.wins }} / {{ data.losses }}</span></div>
             <div class="row"><span>Net P&L:</span> <span class="{% if data.net_pnl >= 0 %}pnl-pos{% else %}pnl-neg{% endif %}">${{ "%.2f"|format(data.net_pnl) }}</span></div>
+            <div class="row"><span>Total Fees:</span> <span class="fee-val">${{ "%.4f"|format(data.total_fees) }}</span></div>
         </div>
         {% endfor %}
     </div>
@@ -641,6 +681,7 @@ DASHBOARD_HTML = """
                     <th>Entry</th>
                     <th>Exit</th>
                     <th>P&L</th>
+                    <th>Fee</th>
                 </tr>
             </thead>
             <tbody>
@@ -654,10 +695,11 @@ DASHBOARD_HTML = """
                         <td>{{ log.entry }}</td>
                         <td>{{ log.exit }}</td>
                         <td class="{% if log.pnl >= 0 %}pnl-pos{% else %}pnl-neg{% endif %}">${{ log.pnl }}</td>
+                        <td class="fee-val">${{ log.fee }}</td>
                     </tr>
                     {% endfor %}
                 {% else %}
-                    <tr><td colspan="7" style="text-align: center; color: #8b949e;">No trades executed yet.</td></tr>
+                    <tr><td colspan="8" style="text-align: center; color: #8b949e;">No trades executed yet.</td></tr>
                 {% endif %}
             </tbody>
         </table>
