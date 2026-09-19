@@ -32,11 +32,11 @@ PRICE_LOG_INTERVAL = 5
 
 # NOTE: "tgt_points" is now an independent per-symbol field (not a global ratio).
 SYMBOLS_CONFIG = [
-    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "2h", "quantity": 5, "range_points": 200,    "tsl_points": 440,    "tgt_points": 1500},
-    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "15m", "quantity": 5, "range_points": 10,      "tsl_points": 10,     "tgt_points": 45},
+    {"symbol": "BTCUSD",     "product_id": 27,     "tick_size": 0.5,    "resolution": "2h", "quantity": 5, "range_points": 200,    "tsl_points": 400,    "tgt_points": 2000},
+    {"symbol": "ETHUSD",     "product_id": 3136,   "tick_size": 0.05,   "resolution": "1h", "quantity": 5, "range_points": 10,      "tsl_points": 10,     "tgt_points": 45},
     {"symbol": "XAUTUSD",    "product_id": 131253, "tick_size": 0.01,   "resolution": "15m", "quantity": 100, "range_points": 5,      "tsl_points": 5,      "tgt_points": 22},
     {"symbol": "SLVONUSD",   "product_id": 124058, "tick_size": 0.01,   "resolution": "5m", "quantity": 0, "range_points": 0.20,      "tsl_points": 0.20,   "tgt_points": 0.80},
-    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "15m", "quantity": 0, "range_points": 0.0065, "tsl_points": 0.0065, "tgt_points": 0.0260},
+    {"symbol": "XRPUSD",     "product_id": 14969,  "tick_size": 0.0001, "resolution": "2h", "quantity": 100, "range_points": 0.0100, "tsl_points": 0.0100, "tgt_points": 0.0430},
     {"symbol": "NEARUSD",    "product_id": 16615,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0150, "tsl_points": 0.0150, "tgt_points": 0.0600},
     {"symbol": "SUIUSD",     "product_id": 17328,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0035, "tsl_points": 0.0035, "tgt_points": 0.0140},
     {"symbol": "EVAAUSD",    "product_id": 98745,  "tick_size": 0.0001, "resolution": "1h", "quantity": 0, "range_points": 0.0025, "tsl_points": 0.0025, "tgt_points": 0.0100},
